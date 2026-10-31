@@ -89,6 +89,12 @@ jobs:
           yarn typecheck
           yarn lint
           yarn ds:check
+      - name: Verify login notice layout without signing in
+        working-directory: ${{ env.CI_ROOT }}
+        run: >-
+          node engineering/foundation/notice-overlap.mjs
+          --label after
+          --env-file runtime/.secrets/foundation.env
       - name: Explore the actual authenticated app in Chromium
         working-directory: ${{ env.CI_ROOT }}
         run: >-

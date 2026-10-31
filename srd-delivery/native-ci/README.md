@@ -6,10 +6,10 @@ or reuse the core fork as the standalone app's module-resolution root.
 
 `restore.py` retrieves the published template tarball with a fixed SHA-512 SRI,
 copies only 330 canonical source files plus 24 explicit runtime/test assets,
-applies 17 checked-in byte overlays, and verifies every file's SHA-256. The source
+applies 18 checked-in byte overlays, and verifies every file's SHA-256. The source
 tree hash must equal
-`e82e9da6068d23562e1f79fc95a7ede36dedcbf0f27e92fa777d03738088cb3a`.
-The 316 unchanged source files and public assets are downloaded rather than
+`ca6ea8cae2bf7edfb20848a81e2f01a5f478901be99f512f6de16bbe94ce436c`.
+The 315 unchanged source files and public assets are downloaded rather than
 republished. No downloaded package code or lifecycle script runs during restore.
 
 Local restoration proof:
@@ -45,6 +45,11 @@ The workflow restores to `/tmp/srd-native-foundation-<run_id>-<attempt>/srd-ai-o
 the original immutable Yarn lock without lifecycle scripts, enables the required
 native PostgreSQL extensions, runs the shipped native migrations and native
 auth/config commands, builds serially, and launches actual browser exploration.
+After the build, the separately indexed `notice-overlap.mjs` helper checks six
+bounded login-notice layout and acknowledgement cases before the authenticated
+explorer runs. It submits no login and attempts no business-data mutations;
+its screenshot label is independent of whether the database was initialized.
+This UI check provides no API, tenant-isolation or business-workflow acceptance.
 It never invokes the embedded/PGlite migration option, resets an existing
 database, runs external messaging/billing/model providers, merges code or deploys.
 
@@ -54,8 +59,14 @@ cookies, raw application output, dependency trees, build output, Neon credential
 and database dumps are excluded. Foundation UI exploration is not the ten-screen
 acceptance suite and does not certify isolation, concurrency or production.
 
-The first hosted attempt stopped at workflow validation before starting a job;
-the job-level runtime path now uses available GitHub contexts. Local restoration
-and syntax verification do not establish a successful native foundation run.
-The explorer's supported `--runtime native-postgres` option must be present in
-the indexed support snapshot before dispatch; it is never patched by shell/sed.
+The first hosted attempt stopped at workflow validation before starting a job.
+The corrected second run was accepted, but GitHub refused runner execution under
+an account billing restriction. No database, migration, build or browser step ran:
+https://github.com/srddevj/open-mercato/actions/runs/41151105769.
+
+The current local source snapshot also includes the verified mobile login notice
+layout fix in `GlobalNoticeBars.tsx`. Local restoration/build/visual evidence is
+separate from the still-unexecuted native database acceptance. The explorer's
+supported `--runtime native-postgres` option is included in the indexed support
+snapshot; it is never patched by shell/sed. Phase, isolation and production
+acceptance remain false.

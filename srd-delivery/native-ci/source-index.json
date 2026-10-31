@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "e82e9da6068d23562e1f79fc95a7ede36dedcbf0f27e92fa777d03738088cb3a",
+  "sourceRevision": "ca6ea8cae2bf7edfb20848a81e2f01a5f478901be99f512f6de16bbe94ce436c",
   "sourceFileCount": 330,
   "sourceAlgorithm": "sha256(sorted relative POSIX paths; uint64be(path UTF8 length), path UTF8, uint64be(file length), file bytes)",
   "template": {
@@ -829,9 +829,9 @@
     {
       "path": "src/components/GlobalNoticeBars.tsx",
       "scope": "canonical-source",
-      "origin": "template",
-      "size": 5300,
-      "sha256": "42129975cc539e78f4e1ef26f20d539a90a4a1a94854b1b17eb37205b3748520",
+      "origin": "overlay",
+      "size": 5331,
+      "sha256": "1f18ce7ad3a8cfc9e5d4ff0001c076173a1f49edd938a26e703901cd8530d9f2",
       "mode": 420
     },
     {
@@ -2863,21 +2863,27 @@
       "mode": 420
     },
     {
+      "path": "engineering/foundation/notice-overlap.mjs",
+      "size": 11867,
+      "sha256": "6d5619760ffab6b72e3d44ffd1d88602841bfd99f570e4bd6705ff4dd41a19c5",
+      "mode": 420
+    },
+    {
       "path": "runtime/browser-tools/browser.mjs",
       "size": 2232,
       "sha256": "6d11c6d029c8927e8b9c63824eece34b5ee2e2009c1584d16701647026a9aea6",
       "mode": 420
     },
     {
-      "path": "runtime/browser-tools/package.json",
-      "size": 328,
-      "sha256": "dda348cfdecc932c725ec02d70c5492008f33e3be0f5b67edd97c505130c7736",
-      "mode": 420
-    },
-    {
       "path": "runtime/browser-tools/package-lock.json",
       "size": 7836,
       "sha256": "6630d27b4e8ec28f079e0dc44788508c7114ef8891fb6ffd73df43a743566c0d",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/package.json",
+      "size": 328,
+      "sha256": "dda348cfdecc932c725ec02d70c5492008f33e3be0f5b67edd97c505130c7736",
       "mode": 420
     }
   ]
