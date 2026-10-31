@@ -427,13 +427,60 @@ def execute(commit, revision):
     return report
 
 
-if __name__ == '__main__':
+def write_completion_marker(commit, revision, exit_code):
+    """Publish only fixed terminal metadata after this invocation owns its root."""
+    if not owned_root:
+        return False
+    if (ROOT.is_symlink() or not ROOT.is_dir() or
+            not re.fullmatch('[a-f0-9]{40}', commit) or
+            not re.fullmatch('[a-f0-9]{64}', revision) or exit_code not in (0, 2)):
+        raise RuntimeError('completion_marker_contract_invalid')
+    artifact = ROOT / 'evidence.zip'
+    ready = artifact.is_file() and not artifact.is_symlink()
+    status = 'executed-awaiting-independent-review' if exit_code == 0 else 'blocked'
+    if exit_code == 0 and not ready:
+        raise RuntimeError('completion_marker_artifact_required')
+    value = {'kind': 'native-verification-completion-v1', 'sourceCommit': commit,
+             'sourceRevision': revision, 'status': status, 'exitCode': exit_code,
+             'artifactReady': ready}
+    fd, name = tempfile.mkstemp(prefix='.completion-', dir=ROOT)
+    temporary = Path(name)
+    try:
+        with os.fdopen(fd, 'w') as target:
+            json.dump(value, target, separators=(',', ':'))
+            target.write('\n')
+            target.flush()
+            os.fsync(target.fileno())
+        # Atomic, exclusive publication: never overwrite a foreign/stale marker.
+        os.link(temporary, ROOT / 'completion.json')
+        directory = os.open(ROOT, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return True
+
+
+def cli(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-commit', required=True)
     parser.add_argument('--source-revision', required=True)
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
     if not re.fullmatch('[a-f0-9]{40}', arguments.source_commit) or not re.fullmatch('[a-f0-9]{64}', arguments.source_revision):
         parser.error('Reviewed full source pins required; placeholders cannot run.')
     execute(arguments.source_commit, arguments.source_revision)
+    exit_code = 0 if report['status'] == 'executed-awaiting-independent-review' and not report.get('artifactExportBlocked') else 2
+    try:
+        write_completion_marker(arguments.source_commit, arguments.source_revision, exit_code)
+    except Exception:
+        # No raw file/process error is exported; marker absence can never pass.
+        report['completionMarkerBlocked'] = True
+        exit_code = 2
     print(json.dumps(report))
-    raise SystemExit(0 if report['status'] == 'executed-awaiting-independent-review' and not report.get('artifactExportBlocked') else 2)
+    return exit_code
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli())

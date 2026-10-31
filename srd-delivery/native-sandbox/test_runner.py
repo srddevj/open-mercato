@@ -16,6 +16,66 @@ def module():
 
 
 class GuardTests(unittest.TestCase):
+    def test_completion_marker_is_owned_atomic_private_and_fixed_metadata_only(self):
+        m = module()
+        with tempfile.TemporaryDirectory() as tmp:
+            m.ROOT = Path(tmp)
+            m.owned_root = True
+            (m.ROOT / 'evidence.zip').write_bytes(b'owned-test-archive')
+            m.report['rawError'] = 'private-canary-must-not-export'
+            self.assertTrue(m.write_completion_marker('a' * 40, 'b' * 64, 0))
+            marker = m.ROOT / 'completion.json'
+            value = json.loads(marker.read_text())
+            self.assertEqual(value, {'kind': 'native-verification-completion-v1',
+                'sourceCommit': 'a' * 40, 'sourceRevision': 'b' * 64,
+                'status': 'executed-awaiting-independent-review', 'exitCode': 0, 'artifactReady': True})
+            self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn('private-canary', marker.read_text())
+            self.assertFalse(list(m.ROOT.glob('.completion-*')))
+
+    def test_unowned_root_and_existing_marker_are_never_changed(self):
+        m = module()
+        with tempfile.TemporaryDirectory() as tmp:
+            m.ROOT = Path(tmp)
+            marker = m.ROOT / 'completion.json'
+            marker.write_text('prior-owner-marker')
+            self.assertFalse(m.write_completion_marker('a' * 40, 'b' * 64, 2))
+            self.assertEqual(marker.read_text(), 'prior-owner-marker')
+            m.owned_root = True
+            with self.assertRaises(FileExistsError):
+                m.write_completion_marker('a' * 40, 'b' * 64, 2)
+            self.assertEqual(marker.read_text(), 'prior-owner-marker')
+            self.assertFalse(list(m.ROOT.glob('.completion-*')))
+
+    def test_completion_marker_refuses_invalid_pins_exit_and_missing_success_artifact(self):
+        m = module()
+        with tempfile.TemporaryDirectory() as tmp:
+            m.ROOT = Path(tmp)
+            m.owned_root = True
+            for commit, revision, code in [('short', 'b' * 64, 2), ('a' * 40, 'bad', 2), ('a' * 40, 'b' * 64, 143), ('a' * 40, 'b' * 64, 0)]:
+                with self.subTest(code=code), self.assertRaises(RuntimeError):
+                    m.write_completion_marker(commit, revision, code)
+                self.assertFalse((m.ROOT / 'completion.json').exists())
+            self.assertTrue(m.write_completion_marker('a' * 40, 'b' * 64, 2))
+            value = json.loads((m.ROOT / 'completion.json').read_text())
+            self.assertEqual(value['status'], 'blocked')
+            self.assertFalse(value['artifactReady'])
+
+    def test_invalid_cli_never_executes_or_writes_marker_and_marker_precedes_print(self):
+        m = module()
+        with patch.object(m, 'execute') as execute, patch.object(m, 'write_completion_marker') as marker, \
+             patch('sys.stderr'):
+            with self.assertRaises(SystemExit):
+                m.cli(['--source-commit', 'short', '--source-revision', 'b' * 64])
+            execute.assert_not_called()
+            marker.assert_not_called()
+        events = []
+        with patch.object(m, 'execute', side_effect=lambda *args: events.append('execute')), \
+             patch.object(m, 'write_completion_marker', side_effect=lambda *args: events.append('marker')), \
+             patch('builtins.print', side_effect=lambda *args: events.append('print')):
+            self.assertEqual(m.cli(['--source-commit', 'a' * 40, '--source-revision', 'b' * 64]), 2)
+        self.assertEqual(events, ['execute', 'marker', 'print'])
+
     def browser_fixture(self, temporary, *, value=None, node='/usr/bin/node', version='1.64.1'):
         m = module()
         root = Path(temporary)

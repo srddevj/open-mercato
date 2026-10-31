@@ -155,11 +155,43 @@ read-only lookup, preserve its timeout, and resolve cleanup first. The journal
 cannot be reused to initiate a second create. Provider timeout is a final bound,
 not evidence that an explicit stop succeeded.
 
+## Future parent supervision contract
+
+`session-monitor.mjs` observes an already-authorized session; it never provisions,
+stops, accepts a phase, or certifies an application defect. Its normalized adapter
+contract is documented in that file. Do not pass raw connector wrappers. Bind the
+actual returned session/command identities and provider resources, not guessed
+values. Use `wait:false` while work is running. Only a strict source-pinned
+`/vercel/sandbox/srd-native-run/completion.json` permits a terminal `wait:true`
+query. A probe or status connection error means **unknown/retry**, not failed app
+work or permission to cancel it. Observer and reporting callbacks have bounded
+timeouts; pending reads are reused. Clock/pause injection is trusted test support.
+Identity/resource/marker mismatches and the absolute cleanup deadline remain
+fail-closed. A shorter expected provider timeout may be explicitly selected from
+one to45minutes; the observed value must match exactly. This does not change the
+controller's fixed45-minute request or authorize another VM.
+
+The future runner writes the small fixed completion marker only after its owned
+cleanup/export. It uses an exclusive atomic0600 publication and never reads or
+overwrites a prior marker. Invalid CLI pins and an unowned/preexisting root cannot
+write one. A marker never replaces the actual matching terminal command exit,
+artifact integrity checks, independent screenshot review, or business acceptance.
+Retrieve and verify the marker and ZIP before the parent's final stop. Keep the
+known session identity and final stop supervision even if observation is lost.
+
+The JSON-line bridge's successful write/stop reply is exactly
+`{"id": <matching RPC id>, "result": {"ok": true}}`. Route by the observed RPC
+method; a `stop` packet must never be sent to the command tool. A `run` packet
+must retain its reviewed executable, separate arguments, source pins, cwd,
+timeout and privilege fields. A malformed/incomplete tool request is not evidence
+that the reviewed command executed.
+
 Offline checks only:
 
 ```sh
 node --check engineering/native-sandbox/controller.mjs
 node --test engineering/native-sandbox/controller.test.mjs
+node --test engineering/native-sandbox/session-monitor.test.mjs
 python3 -m py_compile engineering/native-sandbox/runner.py
 python3 -m unittest discover -s engineering/native-sandbox -p test_runner.py -v
 ```

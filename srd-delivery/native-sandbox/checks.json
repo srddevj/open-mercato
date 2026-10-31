@@ -1,16 +1,15 @@
 {
   "kind": "offline-native-browser-recovery-candidate-review",
-  "status": "offline-reviewed-native-managed-browser-unexecuted",
+  "status": "offline-reviewed-monitor-and-completion-marker-native-unexecuted",
   "controllerGuardTests": 12,
   "connectedBridgeGuardTests": 25,
   "browserGuardTests": 23,
-  "combinedNodeGuards": 143,
-  "mockedRunnerGuardTests": 13,
+  "mockedRunnerGuardTests": 17,
   "archiveGuardTests": 12,
   "independentReviewPassed": true,
   "sourceRevision": "bf8fd4b0e435f79b04a45f4ef0ddc9e50e72c6ee937c7dae784f81ec2f024f99",
   "sourceCommit": "required-after-publication-before-new-runtime-approval",
-  "runnerSha256": "48ed667dfd54f8c53297174afbe8257face2f221bb0c4dc5c9e91a034c2c977e",
+  "runnerSha256": "dd57fcee0bd8e66f9820eeb0c7be03f85db7f8ddcd57733561c4fe4685da817b",
   "managedBrowserRuntimeExecuted": false,
   "newVmAuthorized": false,
   "priorApprovedFlightCompletedAndStopped": true,
@@ -18,18 +17,8 @@
   "files": [
     {
       "path": "engineering/native-sandbox/README.md",
-      "size": 11226,
-      "sha256": "5120889aca49384cffff88f0fed4d0975eb9f25e7e4174e72245ad6d4c47ff01"
-    },
-    {
-      "path": "engineering/native-sandbox/controller.mjs",
-      "size": 6954,
-      "sha256": "76ad6b88cd43728cc1bce025f791c763f2e4cd0dcfb8df9b259bed3f0be63124"
-    },
-    {
-      "path": "engineering/native-sandbox/controller.test.mjs",
-      "size": 7556,
-      "sha256": "d7d64901915493f85cf61ff2f91ed759cba8c7c04e67a0c9d41fed81b9fbf300"
+      "size": 13333,
+      "sha256": "c451e8236f2f9347a816ae5ece8407fdcd876838aaa94efdae2f5469074b648e"
     },
     {
       "path": "engineering/native-sandbox/connected-flight.mjs",
@@ -42,19 +31,43 @@
       "sha256": "d35d85d4d5c06528558fee61fa192cfb097dc97ef494158e617b81d4fde788aa"
     },
     {
+      "path": "engineering/native-sandbox/controller.mjs",
+      "size": 6954,
+      "sha256": "76ad6b88cd43728cc1bce025f791c763f2e4cd0dcfb8df9b259bed3f0be63124"
+    },
+    {
+      "path": "engineering/native-sandbox/controller.test.mjs",
+      "size": 7556,
+      "sha256": "d7d64901915493f85cf61ff2f91ed759cba8c7c04e67a0c9d41fed81b9fbf300"
+    },
+    {
       "path": "engineering/native-sandbox/request.example.json",
       "size": 620,
-      "sha256": "159f233d31f3f01bfaec7a353d66af08e193cc6f35b8a586f2f67fa743396545"
+      "sha256": "5b69fa703216ba4cc0215df101409c67c96875564001dfc6ab8a3628f4edf8c8"
     },
     {
       "path": "engineering/native-sandbox/runner.py",
-      "size": 24649,
-      "sha256": "48ed667dfd54f8c53297174afbe8257face2f221bb0c4dc5c9e91a034c2c977e"
+      "size": 26571,
+      "sha256": "dd57fcee0bd8e66f9820eeb0c7be03f85db7f8ddcd57733561c4fe4685da817b"
+    },
+    {
+      "path": "engineering/native-sandbox/session-monitor.mjs",
+      "size": 6705,
+      "sha256": "0104d6629f59c3c3a2b73be2a1c225c8474e026cc51aed45838e0a6fdc5a7f5b"
+    },
+    {
+      "path": "engineering/native-sandbox/session-monitor.test.mjs",
+      "size": 8104,
+      "sha256": "1b13ea8ae355571da3b6ed40c611afa3f8fb77896f71b56e933a938be56d896b"
     },
     {
       "path": "engineering/native-sandbox/test_runner.py",
-      "size": 17189,
-      "sha256": "f1a0808fd8212ac3fda63ed37350e62de475e427134011f06f3030ee9c76ffe3"
+      "size": 20692,
+      "sha256": "b3c948a75d772f4d4705e364fc997f6f8bbc7b7b163946d7a900aeb72dd750f1"
     }
-  ]
+  ],
+  "previousPublishedRunnerSha256": "48ed667dfd54f8c53297174afbe8257face2f221bb0c4dc5c9e91a034c2c977e",
+  "sessionMonitorGuardTests": 21,
+  "newMonitorRuntimeExecuted": false,
+  "previousCombinedNodeGuards": 143
 }
