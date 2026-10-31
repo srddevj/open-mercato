@@ -41,7 +41,7 @@ and distinct synthetic A/B operator/bootstrap credentials are generated at run
 time into mode-0600 files. No user account, provider credential or production
 database is used.
 
-The workflow restores to `$RUNNER_TEMP/srd-native-foundation/srd-ai-ops`, installs
+The workflow restores to `/tmp/srd-native-foundation-<run_id>-<attempt>/srd-ai-ops`, installs
 the original immutable Yarn lock without lifecycle scripts, enables the required
 native PostgreSQL extensions, runs the shipped native migrations and native
 auth/config commands, builds serially, and launches actual browser exploration.
@@ -54,7 +54,8 @@ cookies, raw application output, dependency trees, build output, Neon credential
 and database dumps are excluded. Foundation UI exploration is not the ten-screen
 acceptance suite and does not certify isolation, concurrency or production.
 
-At preparation time this workflow has **not run on GitHub**. Local restoration
+The first hosted attempt stopped at workflow validation before starting a job;
+the job-level runtime path now uses available GitHub contexts. Local restoration
 and syntax verification do not establish a successful native foundation run.
 The explorer's supported `--runtime native-postgres` option must be present in
 the indexed support snapshot before dispatch; it is never patched by shell/sed.

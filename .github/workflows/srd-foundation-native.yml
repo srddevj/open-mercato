@@ -42,7 +42,7 @@ jobs:
       CI: 'true'
       NEXT_TELEMETRY_DISABLED: '1'
       DO_NOT_TRACK: '1'
-      CI_ROOT: ${{ runner.temp }}/srd-native-foundation
+      CI_ROOT: /tmp/srd-native-foundation-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
