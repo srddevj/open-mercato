@@ -1,0 +1,10 @@
+{
+  "name": "srd-ops-browser-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Development-only browser capture for the owned synthetic application.",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": { "verify": "node verify.mjs" },
+  "dependencies": { "@sparticuz/chromium": "153.0.0" }
+}

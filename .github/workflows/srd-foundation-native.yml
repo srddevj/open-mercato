@@ -1,0 +1,107 @@
+name: SRD native PostgreSQL foundation
+
+# Narrow branch-push/manual fixture verification. No deployment or provider setup.
+on:
+  push:
+    branches:
+      - codex/srd-platform-foundation-20261031
+    paths:
+      - srd-delivery/native-ci/**
+      - .github/workflows/srd-foundation-native.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: srd-native-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-foundation:
+    if: github.ref == 'refs/heads/codex/srd-platform-foundation-20261031'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: srd_ops_f1
+          POSTGRES_USER: postgres
+          # Public bootstrap-only fixture, bound to runner loopback and rotated
+          # to a random private value before the app or migrations use it.
+          POSTGRES_PASSWORD: srd-ci-bootstrap-loopback-only-replaced-before-app
+        ports:
+          - 127.0.0.1:15432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d srd_ops_f1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+      CI_ROOT: ${{ runner.temp }}/srd-native-foundation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: srd-delivery/native-ci
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Restore exact canonical source outside the core checkout
+        run: >-
+          python3 srd-delivery/native-ci/restore.py
+          --destination "$CI_ROOT/srd-ai-ops"
+          --report "$CI_ROOT/evidence/native-ci/restoration.json"
+      - name: Install locked dependencies without lifecycle scripts
+        working-directory: ${{ env.CI_ROOT }}/srd-ai-ops
+        env:
+          YARN_ENABLE_SCRIPTS: 'false'
+        run: |
+          corepack enable
+          corepack prepare yarn@4.17.1 --activate
+          yarn install --immutable --mode=skip-build
+          npm ci --prefix "$CI_ROOT/runtime/browser-tools" --ignore-scripts --no-audit --no-fund
+      - name: Prepare private synthetic credentials and native PostgreSQL extensions
+        env:
+          SRD_NATIVE_CI_CONFIRM: isolated-synthetic
+        run: node srd-delivery/native-ci/prepare-fixture.mjs --root "$CI_ROOT"
+      - name: Generate native module discovery
+        working-directory: ${{ env.CI_ROOT }}/srd-ai-ops
+        run: yarn generate
+      - name: Apply shipped native migrations and initialize two synthetic scopes
+        working-directory: ${{ env.CI_ROOT }}
+        run: >-
+          node engineering/foundation/bootstrap.mjs
+          --env-file runtime/.secrets/foundation.env
+          --output evidence/native-ci/bootstrap-result.json
+          --apply
+      - name: Validate and build the unchanged app serially
+        working-directory: ${{ env.CI_ROOT }}/srd-ai-ops
+        run: |
+          # Next's build writes its environment/type declarations outside the
+          # attested source scope before the standalone TypeScript check.
+          yarn build
+          yarn typecheck
+          yarn lint
+          yarn ds:check
+      - name: Explore the actual authenticated app in Chromium
+        working-directory: ${{ env.CI_ROOT }}
+        run: >-
+          node engineering/foundation/explore-app.mjs
+          --runtime native-postgres
+          --env-file runtime/.secrets/foundation.env
+          --bootstrap-report evidence/native-ci/bootstrap-result.json
+      - name: Keep sanitized reports and screenshots only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srd-native-foundation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CI_ROOT }}/evidence/
+          if-no-files-found: warn
+          retention-days: 1
+          include-hidden-files: false
