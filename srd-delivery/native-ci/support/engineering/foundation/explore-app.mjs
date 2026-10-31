@@ -4,12 +4,13 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
-import { readFileSync, writeFileSync, mkdirSync, lstatSync, realpathSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, lstatSync, realpathSync, existsSync, openSync, closeSync, constants } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateEnvironment } from './bootstrap.mjs';
+import { runAcceptance, createNativeInspector, validateBootstrap, reserveEvidence, writeReservedEvidence } from './acceptance.mjs';
 import { launchBrowser, browserConfiguration } from '../../runtime/browser-tools/browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -19,6 +20,7 @@ const screenshotDirectory = resolve(evidence, 'screenshots');
 const descriptorPath = resolve(app, '.ai/qa/test-env.json');
 const reportPath = resolve(evidence, 'exploration-result.json');
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 
 class ExplorationError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -29,8 +31,36 @@ const within = (base, path) => {
   return child !== '..' && !child.startsWith('../') && !isAbsolute(child);
 };
 
-function readPrivateConfiguration(path) {
-  const metadata = lstatSync(path);
+export function assertOwnedFile(path, base, { createParents = false, maximumBytes = 2_000_000 } = {}) {
+  path = resolve(path);
+  base = resolve(base);
+  if (!within(root, base) || !within(base, path) || path === base) fail('OWNED_ARTIFACT_PATH_REQUIRED');
+  let directory = root;
+  for (const part of relative(root, dirname(path)).split('/').filter(Boolean)) {
+    directory = resolve(directory, part);
+    if (!existsSync(directory) && createParents) mkdirSync(directory, { mode: 0o700 });
+    const metadata = lstatSync(directory);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail('OWNED_ARTIFACT_PATH_REQUIRED');
+  }
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1 || metadata.size > maximumBytes) fail('OWNED_ARTIFACT_FILE_REQUIRED');
+    return metadata;
+  } catch (error) {
+    if (error?.code === 'ENOENT' && createParents) return null;
+    throw error;
+  }
+}
+
+function writeOwnedJson(path, base, value) {
+  assertOwnedFile(path, base, { createParents: true });
+  const descriptor = openSync(path, constants.O_CREAT | constants.O_WRONLY | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+  try { writeFileSync(descriptor, JSON.stringify(value, null, 2) + '\n'); }
+  finally { closeSync(descriptor); }
+}
+
+export function readPrivateConfiguration(path) {
+  const metadata = assertOwnedFile(path, resolve(root, 'runtime/.secrets'), { maximumBytes: 65536 });
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 65536 || (metadata.mode & 0o077)) fail('PRIVATE_CONFIGURATION_FILE_REQUIRED');
   if (!within(realpathSync(resolve(root, 'runtime/.secrets')), realpathSync(path))) fail('PRIVATE_CONFIGURATION_OUTSIDE_OWNED_DIRECTORY');
   return validateEnvironment(parseEnv(readFileSync(path, 'utf8')));
@@ -51,8 +81,8 @@ export function validateBootstrapReport(report, { baselineOnly = false } = {}) {
   return report;
 }
 
-function readBootstrapReport(path, options) {
-  if (!within(resolve(root, 'evidence'), resolve(path))) fail('BOOTSTRAP_EVIDENCE_OUTSIDE_PROJECT');
+export function readBootstrapReport(path, options) {
+  assertOwnedFile(path, resolve(root, 'evidence'));
   const report = JSON.parse(readFileSync(path, 'utf8'));
   return validateBootstrapReport(report, options);
 }
@@ -62,22 +92,166 @@ export function parseArguments(argv) {
   let bootstrapPath = resolve(evidence, 'bootstrap-result.json');
   let baselineOnly = false;
   let runtime = 'pglite';
+  let verifyNativeApi = false;
+  let sourceRevision;
   const seen = new Set();
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index];
-    if (!['--env-file', '--bootstrap-report', '--baseline-only', '--runtime'].includes(flag) || seen.has(flag)) fail('INVALID_ARGUMENTS');
+    if (!['--env-file', '--bootstrap-report', '--baseline-only', '--runtime', '--verify-native-api', '--source-revision'].includes(flag) || seen.has(flag)) fail('INVALID_ARGUMENTS');
     seen.add(flag);
     if (flag === '--baseline-only') { baselineOnly = true; continue; }
+    if (flag === '--verify-native-api') { verifyNativeApi = true; continue; }
     if (!argv[index + 1] || argv[index + 1].startsWith('--')) fail('INVALID_ARGUMENTS');
     const value = argv[++index];
     if (flag === '--runtime') {
       if (!['pglite', 'native-postgres'].includes(value)) fail('INVALID_RUNTIME');
       runtime = value;
-    } else if (flag === '--env-file') envPath = resolve(value);
+    } else if (flag === '--source-revision') sourceRevision = value;
+    else if (flag === '--env-file') envPath = resolve(value);
     else bootstrapPath = resolve(value);
   }
   if (!envPath) fail('PRIVATE_CONFIGURATION_FILE_REQUIRED');
-  return { envPath, bootstrapPath, baselineOnly, runtime };
+  if (sourceRevision !== undefined && !REVISION.test(sourceRevision)) fail('EXACT_SOURCE_REVISION_REQUIRED');
+  if (verifyNativeApi && (baselineOnly || runtime !== 'native-postgres')) fail('NATIVE_API_REQUIRES_AUTHENTICATED_NATIVE_RUNTIME');
+  if (verifyNativeApi && !sourceRevision) fail('NATIVE_API_SOURCE_REVISION_REQUIRED');
+  return { envPath, bootstrapPath, baselineOnly, runtime, verifyNativeApi, sourceRevision };
+}
+
+export function assertNativeApiPrerequisites(options, report) {
+  if (!options.verifyNativeApi || options.baselineOnly || options.runtime !== 'native-postgres' || !REVISION.test(options.sourceRevision ?? '')) fail('NATIVE_API_REQUIRES_AUTHENTICATED_NATIVE_RUNTIME');
+  if (!UUID.test(report.runId ?? '') || report.baselineOnly !== false || report.selectedRuntime !== 'native-postgres' ||
+      report.loginPerformed !== true || report.observedSelectorsBeforeLogin !== true ||
+      !report.http?.some((entry) => entry.route === '/api/healthz' && entry.status === 200 && entry.healthStatus === 'ok')) fail('NATIVE_API_REQUIRES_OBSERVED_AUTHENTICATED_UI');
+  for (const [route, label, width, height] of [
+    ['/backend', 'dashboard-desktop', 1440, 1000], ['/backend/customers/people', 'contacts-desktop', 1440, 1000],
+    ['/backend', 'dashboard-mobile', 375, 812], ['/backend/customers/people', 'contacts-mobile', 375, 812],
+  ]) {
+    const observed = report.pages?.some((page) => page.requestedRoute === route && page.actualRoute === route &&
+      page.status >= 200 && page.status < 400 && page.renderingErrorDetected === false && page.observation &&
+      page.viewport?.width === width && page.viewport?.height === height);
+    const captured = report.screenshots?.some((shot) => shot.file === relative(root, resolve(screenshotDirectory, label + '.png')).split('\\').join('/') &&
+      shot.kind === 'actual-synthetic-development-app' && shot.inputValuesMasked === true);
+    if (!observed || !captured) fail('NATIVE_API_REQUIRES_OBSERVED_AUTHENTICATED_UI');
+  }
+}
+
+export function nativeApiSubsetPassed(report, sourceRevision) {
+  return report?.kind === 'native-foundation-api-acceptance-candidate' && report.status === 'passed-native-api-foundation-subset' &&
+    report.executionKind === 'native-api-and-database' && report.sourceRevision === sourceRevision &&
+    report.apiPersistenceAndTenantSubsetAccepted === true && report.phaseAccepted === false && report.productionAccepted === false &&
+    report.backgroundJobsAccepted === false && report.databaseLeastPrivilegeAccepted === false &&
+    report.credentialsIncluded === false && report.rawBodiesRetained === false &&
+    report.database?.kind === 'native-postgres17-direct-read' && Number.isInteger(report.database.serverVersionNumber) &&
+    report.database.serverVersionNumber >= 170000 && report.database.serverVersionNumber < 180000 &&
+    report.cleanup?.contactsRemaining === 0 && report.cleanup?.sessionsRevoked === 2 && report.cleanup?.databaseClosed === true &&
+    !report.cleanup?.errorCode && !report.cleanup?.sessionError;
+}
+
+function nativeApiEvidence(report, options, exploration, config, actualRunner) {
+  const sanitize = makeSanitizer(config);
+  const code = (value) => typeof value === 'string' && /^[A-Z0-9_]{1,100}$/.test(value) ? sanitize(value, 100) : null;
+  const count = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const timestamp = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ? value : null;
+  const passed = actualRunner && nativeApiSubsetPassed(report, options.sourceRevision);
+  const knownStatuses = ['failed', 'blocked', 'failed-cleanup', 'passed-native-api-foundation-subset', 'passed-harness-simulation'];
+  let status = knownStatuses.includes(report?.status) ? report.status : 'blocked';
+  if (!actualRunner && status === 'passed-native-api-foundation-subset') status = 'passed-harness-simulation';
+  else if (actualRunner && status === 'passed-native-api-foundation-subset' && !passed) status = 'failed-incomplete-acceptance';
+  return {
+    schemaVersion: 1, kind: 'native-foundation-api-acceptance-candidate',
+    runId: UUID.test(report?.runId ?? '') ? report.runId : null, explorationRunId: exploration.runId,
+    startedAtUtc: timestamp(report?.startedAtUtc), endedAtUtc: timestamp(report?.endedAtUtc),
+    sourceRevision: options.sourceRevision, status,
+    executionKind: actualRunner ? report?.executionKind === 'native-api-and-database' ? 'native-api-and-database' : 'unverified' : 'harness-unit-simulation',
+    phaseAccepted: false, productionAccepted: false, backgroundJobsAccepted: false, databaseLeastPrivilegeAccepted: false,
+    exportRestoreAccepted: false, apiPersistenceAndTenantSubsetAccepted: passed,
+    credentialsIncluded: false, rawBodiesRetained: false,
+    database: report?.database?.kind === 'native-postgres17-direct-read' && Number.isInteger(report.database.serverVersionNumber) &&
+      report.database.serverVersionNumber >= 170000 && report.database.serverVersionNumber < 180000
+      ? { kind: 'native-postgres17-direct-read', serverVersionNumber: report.database.serverVersionNumber } : null,
+    errorCode: code(report?.errorCode), failedStage: typeof report?.failedStage === 'string' ? sanitize(report.failedStage, 100) : null,
+    cases: Array.isArray(report?.cases) ? report.cases.slice(0, 100).map((entry) => ({
+      id: typeof entry.id === 'string' ? sanitize(entry.id, 100) : null, status: entry.status === 'passed' ? 'passed' : 'failed', code: code(entry.code),
+    })) : [],
+    requests: Array.isArray(report?.requests) ? report.requests.slice(0, 500).map((entry) => ({
+      actor: ['A', 'B', 'anonymous'].includes(entry.actor) ? entry.actor : 'anonymous',
+      method: ['GET', 'POST', 'PUT', 'DELETE'].includes(entry.method) ? entry.method : 'unavailable',
+      route: typeof entry.route === 'string' ? sanitize(entry.route.split('?')[0], 200) : null, status: count(entry.status),
+    })) : [],
+    cleanup: { contactsRemoved: count(report?.cleanup?.contactsRemoved), contactsRemaining: count(report?.cleanup?.contactsRemaining),
+      sessionsRevoked: count(report?.cleanup?.sessionsRevoked), databaseClosed: report?.cleanup?.databaseClosed === true,
+      errorCode: code(report?.cleanup?.errorCode), sessionError: code(report?.cleanup?.sessionError) },
+  };
+}
+
+export async function verifyNativeApiAfterUi({ options, exploration, config, bootstrap, origin }, operations = {}) {
+  assertNativeApiPrerequisites(options, exploration);
+  validateBootstrap(bootstrap);
+  const path = resolve(evidence, 'native-api-acceptance-' + exploration.runId + '.json');
+  const createInspector = operations.createInspector ?? createNativeInspector;
+  const run = operations.run ?? runAcceptance;
+  const actualRunner = createInspector === createNativeInspector && run === runAcceptance;
+  const summary = { requested: true, executed: false, status: 'blocked', report: null, passed: false,
+    executionKind: actualRunner ? 'native-api-stage' : 'harness-unit-simulation',
+    phaseAccepted: false, productionAccepted: false, backgroundJobsAccepted: false, exportRestoreAccepted: false };
+  let descriptor;
+  let inspector;
+  let apiReport;
+  try {
+    descriptor = reserveEvidence(path);
+    summary.report = relative(root, path).split('\\').join('/');
+    writeReservedEvidence(descriptor, { kind: 'native-foundation-api-acceptance-candidate', status: 'starting', sourceRevision: options.sourceRevision,
+      phaseAccepted: false, productionAccepted: false, backgroundJobsAccepted: false, exportRestoreAccepted: false });
+    inspector = createInspector(config);
+    summary.executed = true;
+    apiReport = await run({ config, bootstrap, baseUrl: origin, sourceRevision: options.sourceRevision, inspector });
+    // Retain the reviewed structured evidence fields only; unknown properties and raw bodies never cross this boundary.
+    const saved = nativeApiEvidence(apiReport, options, exploration, config, summary.executionKind === 'native-api-stage');
+    writeReservedEvidence(descriptor, saved);
+    summary.status = saved.status;
+    summary.passed = summary.executionKind === 'native-api-stage' && nativeApiSubsetPassed(apiReport, options.sourceRevision);
+    if (!summary.passed) summary.errorCode = 'NATIVE_API_ACCEPTANCE_INCOMPLETE';
+  } catch {
+    summary.status = 'blocked';
+    summary.errorCode = 'NATIVE_API_ACCEPTANCE_OPERATION_FAILED';
+    if (descriptor !== undefined) {
+      try { writeReservedEvidence(descriptor, { kind: 'native-foundation-api-acceptance-candidate', status: 'blocked',
+        sourceRevision: options.sourceRevision, errorCode: summary.errorCode, phaseAccepted: false, productionAccepted: false,
+        backgroundJobsAccepted: false, exportRestoreAccepted: false, credentialsIncluded: false, rawBodiesRetained: false }); } catch { summary.report = null; }
+    }
+  } finally {
+    if (inspector && apiReport?.cleanup?.databaseClosed !== true) {
+      try { await inspector.close(); } catch { summary.passed = false; summary.errorCode = 'NATIVE_API_DATABASE_CLEANUP_FAILED'; }
+    }
+    if (descriptor !== undefined) { try { closeSync(descriptor); } catch { summary.passed = false; summary.errorCode = 'NATIVE_API_EVIDENCE_CLEANUP_FAILED'; } }
+  }
+  return summary;
+}
+
+export function explorationPassed(report) {
+  return report.status === 'explored-development-ui-not-accepted' && report.applicationCleanup?.stopped === true && report.browserClosed === true &&
+    report.evidenceWritten === true && (!report.loginAttempted || report.uiSessionCleanup?.revoked === true || report.uiSessionCleanup?.sessionFound === false && !report.loginPerformed) &&
+    (!report.nativeApiVerification?.requested || report.nativeApiVerification.passed === true);
+}
+
+export async function revokeObservedUiSession(context, origin) {
+  const summary = { attempted: true, sessionFound: false, revoked: false, credentialsIncluded: false };
+  try {
+    const url = new URL(origin);
+    if (url.origin !== origin || url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port) fail('OWNED_LOOPBACK_APP_REQUIRED');
+    const token = (await context.cookies(origin)).find((cookie) => cookie.name === 'auth_token')?.value;
+    if (!token) return summary;
+    summary.sessionFound = true;
+    const headers = { authorization: 'Bearer ' + token, cookie: 'auth_token=' + encodeURIComponent(token) };
+    const logout = await context.request.post(origin + '/api/auth/logout', { headers, maxRedirects: 0, timeout: 12000 });
+    summary.logoutStatus = logout.status();
+    if (![302, 303, 307, 308].includes(summary.logoutStatus)) fail('UI_SESSION_LOGOUT_FAILED');
+    const protectedResponse = await context.request.get(origin + '/api/customers/people?page=1&pageSize=1', { headers, maxRedirects: 0, timeout: 12000 });
+    summary.reusedTokenStatus = protectedResponse.status();
+    summary.revoked = summary.reusedTokenStatus === 401;
+    if (!summary.revoked) summary.errorCode = 'UI_SESSION_REVOCATION_NOT_VERIFIED';
+  } catch { summary.errorCode = 'UI_SESSION_REVOCATION_NOT_VERIFIED'; }
+  return summary;
 }
 
 function makeSanitizer(config) {
@@ -166,6 +340,7 @@ async function screenshot(page, name, config, report) {
     masks.push(page.getByText(config[name], { exact: false }));
   }
   const path = resolve(screenshotDirectory, name + '.png');
+  assertOwnedFile(path, screenshotDirectory, { createParents: true, maximumBytes: 30_000_000 });
   await page.screenshot({ path, fullPage: true, mask: masks });
   report.screenshots.push({ file: relative(root, path).split('\\').join('/'), kind: report.baselineOnly ? 'actual-uninitialized-app-baseline' : 'actual-synthetic-development-app', inputValuesMasked: true });
 }
@@ -200,21 +375,29 @@ export async function main(argv = process.argv.slice(2)) {
     schemaVersion: 1, kind: 'actual-app-exploration', runId: randomUUID(),
     startedAtUtc: new Date().toISOString(), clientDate: '2026-10-31 Asia/Dhaka',
     status: 'blocked', phaseAccepted: false, productionAccepted: false, nativePostgresSecurityAccepted: false,
+    backgroundJobsAccepted: false, exportRestoreAccepted: false,
     credentialsIncluded: false, inputValuesIncluded: false, rawApplicationLogsRetained: false,
-    observedSelectorsBeforeLogin: false, loginPerformed: false,
+    observedSelectorsBeforeLogin: false, loginPerformed: false, loginAttempted: false,
+    nativeApiVerification: { requested: false, executed: false, status: 'not-requested', passed: false },
     http: [], pages: [], screenshots: [], networkErrors: [], consoleErrors: [], pageErrors: [],
   };
   let child;
   let exited;
   let browser;
+  let context;
+  let origin;
   let descriptor;
   let stage = 'input';
   try {
-    const { envPath, bootstrapPath, baselineOnly, runtime } = parseArguments(argv);
+    const options = parseArguments(argv);
+    const { envPath, bootstrapPath, baselineOnly, runtime, verifyNativeApi, sourceRevision } = options;
     const config = readPrivateConfiguration(envPath);
     const bootstrap = readBootstrapReport(bootstrapPath, { baselineOnly });
+    if (verifyNativeApi) validateBootstrap(bootstrap);
     report.baselineOnly = baselineOnly;
     report.selectedRuntime = runtime;
+    report.sourceRevision = sourceRevision ?? null;
+    report.nativeApiVerification = { requested: verifyNativeApi, executed: false, status: verifyNativeApi ? 'waiting-for-observed-ui' : 'not-requested', passed: false };
     report.kind = runtime === 'native-postgres'
       ? 'actual-app-exploration-on-native-postgres-development'
       : 'actual-app-exploration-on-pglite-development';
@@ -225,7 +408,9 @@ export async function main(argv = process.argv.slice(2)) {
       report.baselineRequestsBlocked = [];
     }
     const sanitize = makeSanitizer(config);
-    mkdirSync(screenshotDirectory, { recursive: true });
+    assertOwnedFile(resolve(screenshotDirectory, 'preflight.png'), screenshotDirectory, { createParents: true });
+    assertOwnedFile(reportPath, evidence, { createParents: true });
+    assertOwnedFile(descriptorPath, dirname(descriptorPath), { createParents: true });
     if (existsSync(descriptorPath)) {
       try {
         const previous = JSON.parse(readFileSync(descriptorPath, 'utf8'));
@@ -237,7 +422,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
     stage = 'application-start';
     const port = await availablePort();
-    const origin = 'http://127.0.0.1:' + port;
+    origin = 'http://127.0.0.1:' + port;
     const environment = { ...process.env, ...Object.fromEntries(Object.entries(config).filter(([key]) => !key.startsWith('SRD_'))) };
     Object.assign(environment, {
       NODE_ENV: 'production', HOSTNAME: '127.0.0.1', APP_URL: origin, NEXT_PUBLIC_APP_URL: origin,
@@ -261,7 +446,7 @@ export async function main(argv = process.argv.slice(2)) {
       startedByThisRepo: true, startScript: 'engineering/foundation/explore-app.mjs', stopScript: '',
       app: { startCommand: 'next start --hostname 127.0.0.1 --port <discovered>', port, healthPath: '/api/healthz', pid: child.pid },
       services: baselineOnly ? [] : [{ type: runtime === 'native-postgres' ? 'native-postgres-development' : 'postgres-compatible-pglite-development', host: '127.0.0.1', port: Number(new URL(config.DATABASE_URL).port || 5432), nativePostgresAccepted: false }],
-      credentials: [], credentialFixtureFile: 'runtime/.secrets/foundation.env',
+      credentials: [], credentialFixtureFile: relative(root, envPath).split('\\').join('/'),
       browser: { provider: 'playwright', installed: true, command: 'runtime/browser-tools/browser.mjs', notes: 'Actual installed browser used by the integrated runner.' },
       playwright: { runner: 'playwright', installed: true, config: '.ai/qa/tests/playwright.config.ts', browsers: ['chromium'] },
       testRunner: { name: 'playwright', config: '.ai/qa/tests/playwright.config.ts' }, platform: process.platform,
@@ -272,8 +457,7 @@ export async function main(argv = process.argv.slice(2)) {
           ? 'Native PostgreSQL development exploration selected explicitly by CLI. Database version and security/tenant-isolation/concurrency/recovery acceptance require separate evidence; no phase or production acceptance follows from this explorer. Cleanup is performed in finally by this runner.'
           : 'PGlite serialized development exploration only. Native PostgreSQL, isolation/concurrency/recovery and production gates remain open. App and browser must share the owning process tree. Cleanup is performed in finally by this runner.',
     };
-    mkdirSync(dirname(descriptorPath), { recursive: true });
-    writeFileSync(descriptorPath, JSON.stringify(descriptor, null, 2) + '\n');
+    writeOwnedJson(descriptorPath, dirname(descriptorPath), descriptor);
     await waitForLogin(origin, child, report);
     if (startupError) fail('APPLICATION_START_FAILED');
     stage = 'health';
@@ -286,11 +470,11 @@ export async function main(argv = process.argv.slice(2)) {
     report.http.push(health);
     descriptor.status = 'running';
     descriptor.healthVerified = health.status === 200 && health.healthStatus === 'ok';
-    writeFileSync(descriptorPath, JSON.stringify(descriptor, null, 2) + '\n');
+    writeOwnedJson(descriptorPath, dirname(descriptorPath), descriptor);
     stage = 'browser-launch';
     browser = await launchBrowser();
     report.browser = { actualVersion: browser.version(), playwrightVersion: (await browserConfiguration()).playwrightVersion };
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     if (baselineOnly) {
       await context.route('**/*', async (route) => {
         const request = route.request();
@@ -344,6 +528,7 @@ export async function main(argv = process.argv.slice(2)) {
     stage = 'login-submit';
     const submitName = submitButton.ariaLabel || submitButton.text;
     const submit = submitName ? page.getByRole('button', { name: submitName, exact: true }) : page.locator('button').nth(submitButton.index);
+    report.loginAttempted = true;
     await submit.click();
     try { await page.waitForURL((url) => url.pathname.startsWith('/backend'), { timeout: 25000 }); }
     catch {
@@ -359,11 +544,17 @@ export async function main(argv = process.argv.slice(2)) {
       ['/backend', 'dashboard-mobile', { width: 375, height: 812 }],
       ['/backend/customers/people', 'contacts-mobile', { width: 375, height: 812 }],
     ]) await inspectRoute(page, origin, route, label, viewport, config, report, sanitize);
+    if (verifyNativeApi) {
+      stage = 'native-api-acceptance';
+      report.nativeApiVerification = await verifyNativeApiAfterUi({ options, exploration: report, config, bootstrap, origin });
+      if (!report.nativeApiVerification.passed) fail('NATIVE_API_ACCEPTANCE_FAILED');
+    }
     report.status = 'explored-development-ui-not-accepted';
   } catch (error) {
     report.failedStage = stage;
     report.errorCode = error instanceof ExplorationError ? error.code : 'APP_EXPLORATION_STEP_FAILED';
   } finally {
+    if (report.loginAttempted && context && origin) report.uiSessionCleanup = await revokeObservedUiSession(context, origin);
     if (browser) {
       try { await browser.close(); report.browserClosed = true; }
       catch { report.browserClosed = false; }
@@ -372,18 +563,20 @@ export async function main(argv = process.argv.slice(2)) {
     report.endedAtUtc = new Date().toISOString();
     if (descriptor) {
       try {
+        assertOwnedFile(descriptorPath, dirname(descriptorPath));
         const current = JSON.parse(readFileSync(descriptorPath, 'utf8'));
-        if (current.runId === report.runId) writeFileSync(descriptorPath, JSON.stringify({ ...descriptor, status: 'stopped', stoppedAt: report.endedAtUtc }, null, 2) + '\n');
+        if (current.runId === report.runId) writeOwnedJson(descriptorPath, dirname(descriptorPath), { ...descriptor, status: 'stopped', stoppedAt: report.endedAtUtc });
       } catch { report.descriptorCleanupWarning = 'DESCRIPTOR_STOP_STATE_NOT_VERIFIED'; }
     }
-    mkdirSync(evidence, { recursive: true });
-    writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
+    try { report.evidenceWritten = true; writeOwnedJson(reportPath, evidence, report); }
+    catch { report.evidenceWritten = false; report.status = 'blocked'; report.reportWriteError = 'EXPLORATION_REPORT_WRITE_FAILED'; }
   }
   return report;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const report = await main();
-  process.stdout.write(JSON.stringify({ status: report.status, errorCode: report.errorCode ?? null, failedStage: report.failedStage ?? null, loginPerformed: report.loginPerformed, screenshotCount: report.screenshots.length, report: relative(root, reportPath), phaseAccepted: false, productionAccepted: false, applicationStopped: report.applicationCleanup.stopped }, null, 2) + '\n');
-  process.exitCode = report.status === 'explored-development-ui-not-accepted' && report.applicationCleanup.stopped && report.browserClosed ? 0 : 2;
+  process.stdout.write(JSON.stringify({ status: report.status, errorCode: report.errorCode ?? null, failedStage: report.failedStage ?? null, loginPerformed: report.loginPerformed, screenshotCount: report.screenshots.length, report: report.evidenceWritten ? relative(root, reportPath) : null,
+    nativeApiVerification: report.nativeApiVerification, phaseAccepted: false, productionAccepted: false, applicationStopped: report.applicationCleanup.stopped }, null, 2) + '\n');
+  process.exitCode = explorationPassed(report) ? 0 : 2;
 }

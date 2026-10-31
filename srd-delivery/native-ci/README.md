@@ -5,11 +5,11 @@ it does not run `create-mercato-app`, generate a second app, upgrade dependencie
 or reuse the core fork as the standalone app's module-resolution root.
 
 `restore.py` retrieves the published template tarball with a fixed SHA-512 SRI,
-copies only 330 canonical source files plus 24 explicit runtime/test assets,
-applies 18 checked-in byte overlays, and verifies every file's SHA-256. The source
+copies only 336 canonical source files plus 24 explicit runtime/test assets,
+applies 28 checked-in byte overlays, and verifies every file's SHA-256. The source
 tree hash must equal
-`ca6ea8cae2bf7edfb20848a81e2f01a5f478901be99f512f6de16bbe94ce436c`.
-The 315 unchanged source files and public assets are downloaded rather than
+`bf8fd4b0e435f79b04a45f4ef0ddc9e50e72c6ee937c7dae784f81ec2f024f99`.
+The 312 unchanged source files and public assets are downloaded rather than
 republished. No downloaded package code or lifecycle script runs during restore.
 
 Local restoration proof:
@@ -44,12 +44,17 @@ database is used.
 The workflow restores to `/tmp/srd-native-foundation-<run_id>-<attempt>/srd-ai-ops`, installs
 the original immutable Yarn lock without lifecycle scripts, enables the required
 native PostgreSQL extensions, runs the shipped native migrations and native
-auth/config commands, builds serially, and launches actual browser exploration.
+auth/config commands, builds serially, runs the real Jest suite, and launches browser verification.
 After the build, the separately indexed `notice-overlap.mjs` helper checks six
 bounded login-notice layout and acknowledgement cases before the authenticated
 explorer runs. It submits no login and attempts no business-data mutations;
 its screenshot label is independent of whether the database was initialized.
-This UI check provides no API, tenant-isolation or business-workflow acceptance.
+The public-entry regression then checks anonymous routes and actual healthy availability without signing in.
+The explorer opts into the reviewed native API subset only after four authenticated
+UI captures. Its source pin comes from the successful byte-restoration report,
+not HEAD or a guessed app commit. Synthetic contact cleanup, both API-session
+revocations and UI-session logout are required by the helper. These bounded checks
+do not establish whole-platform, background-job, restore or production acceptance.
 It never invokes the embedded/PGlite migration option, resets an existing
 database, runs external messaging/billing/model providers, merges code or deploys.
 
@@ -64,8 +69,11 @@ The corrected second run was accepted, but GitHub refused runner execution under
 an account billing restriction. No database, migration, build or browser step ran:
 https://github.com/srddevj/open-mercato/actions/runs/41151105769.
 
-The current local source snapshot also includes the verified mobile login notice
-layout fix in `GlobalNoticeBars.tsx`. Local restoration/build/visual evidence is
+The current local source snapshot includes the mobile login notice fix, the
+public-entry routing boundary and native login availability feedback. The revised
+`.ds-check-ignore` runtime asset is included byte-for-byte. Local evidence passed
+15 entry/availability cases, six notice cases and nine real Jest tests; that local
+runtime still reports health 503. Local restoration/build/visual evidence is
 separate from the still-unexecuted native database acceptance. The explorer's
 supported `--runtime native-postgres` option is included in the indexed support
 snapshot; it is never patched by shell/sed. Phase, isolation and production

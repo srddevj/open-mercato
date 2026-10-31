@@ -1,0 +1,18 @@
+{
+  "teamId": "REQUIRED_OWNER_APPROVED_TEAM_ID",
+  "projectId": "REQUIRED_EXISTING_OR_SEPARATELY_APPROVED_PROJECT_ID",
+  "sourceCommit": "PIN_40_HEX_COMMIT_AFTER_FINAL_UI_VERIFICATION",
+  "sourceRevision": "bf8fd4b0e435f79b04a45f4ef0ddc9e50e72c6ee937c7dae784f81ec2f024f99",
+  "runnerSha256": "4e6a2fd37230f3340d2588c6be1bc8113ac286b20370b910749215a7ee1c3b6e",
+  "billingBasis": "unknown",
+  "spendApprovalUsd": null,
+  "resources": {
+    "vcpus": 4,
+    "derivedMemoryGb": 8
+  },
+  "timeoutMs": 2700000,
+  "persistent": false,
+  "ports": [],
+  "region": "iad1",
+  "image": "vercel/sandbox/universal:latest"
+}

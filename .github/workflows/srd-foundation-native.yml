@@ -57,6 +57,17 @@ jobs:
           python3 srd-delivery/native-ci/restore.py
           --destination "$CI_ROOT/srd-ai-ops"
           --report "$CI_ROOT/evidence/native-ci/restoration.json"
+      - name: Record the byte-verified source revision
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          result = json.loads((Path(os.environ['CI_ROOT']) / 'evidence/native-ci/restoration.json').read_text())
+          revision = result.get('sourceRevision', '')
+          assert result.get('status') == 'restored-byte-identical' and re.fullmatch('[a-f0-9]{64}', revision)
+          with open(os.environ['GITHUB_ENV'], 'a') as target:
+              target.write('SRD_CANONICAL_SOURCE_REVISION=' + revision + '\n')
+          PY
       - name: Install locked dependencies without lifecycle scripts
         working-directory: ${{ env.CI_ROOT }}/srd-ai-ops
         env:
@@ -86,6 +97,7 @@ jobs:
           # Next's build writes its environment/type declarations outside the
           # attested source scope before the standalone TypeScript check.
           yarn build
+          yarn test --runInBand
           yarn typecheck
           yarn lint
           yarn ds:check
@@ -95,13 +107,24 @@ jobs:
           node engineering/foundation/notice-overlap.mjs
           --label after
           --env-file runtime/.secrets/foundation.env
+      - name: Verify public entry and healthy availability without signing in
+        working-directory: ${{ env.CI_ROOT }}
+        run: >-
+          node engineering/foundation/entry-boundary.mjs
+          --label after
+          --expected-availability healthy
+          --runtime native-postgres
+          --env-file runtime/.secrets/foundation.env
       - name: Explore the actual authenticated app in Chromium
+        # Opt-in API checks run only after four authenticated UI captures.
         working-directory: ${{ env.CI_ROOT }}
         run: >-
           node engineering/foundation/explore-app.mjs
           --runtime native-postgres
           --env-file runtime/.secrets/foundation.env
           --bootstrap-report evidence/native-ci/bootstrap-result.json
+          --verify-native-api
+          --source-revision "$SRD_CANONICAL_SOURCE_REVISION"
       - name: Keep sanitized reports and screenshots only
         if: always()
         uses: actions/upload-artifact@v4

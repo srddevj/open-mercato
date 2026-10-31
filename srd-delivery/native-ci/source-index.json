@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "sourceRevision": "ca6ea8cae2bf7edfb20848a81e2f01a5f478901be99f512f6de16bbe94ce436c",
-  "sourceFileCount": 330,
+  "sourceRevision": "bf8fd4b0e435f79b04a45f4ef0ddc9e50e72c6ee937c7dae784f81ec2f024f99",
+  "sourceFileCount": 336,
   "sourceAlgorithm": "sha256(sorted relative POSIX paths; uint64be(path UTF8 length), path UTF8, uint64be(file length), file bytes)",
   "template": {
     "package": "create-mercato-app",
@@ -13,9 +13,9 @@
     {
       "path": ".ds-check-ignore",
       "scope": "runtime-asset",
-      "origin": "template",
-      "size": 49055,
-      "sha256": "2ce0965d2ef8cfae776a1c42ee385b94cf8ac2d1b381411c639525b2eada83ce",
+      "origin": "overlay",
+      "size": 49178,
+      "sha256": "ff61b915abf01abae1ccc3ccecbfedbde284642d33a1da030afd9eed7a254cce",
       "mode": 420
     },
     {
@@ -85,9 +85,9 @@
     {
       "path": "next.config.ts",
       "scope": "canonical-source",
-      "origin": "template",
-      "size": 5952,
-      "sha256": "0c7248ce65193dfa7e405df48dc9548d57fe24fc6dff589d59f0dcbee3b3128c",
+      "origin": "overlay",
+      "size": 6075,
+      "sha256": "f660d6736f7fe994d8e738b3c1225ce07aeefa23349ffff95fd52bb67694b29d",
       "mode": 420
     },
     {
@@ -741,17 +741,17 @@
     {
       "path": "src/app/page.tsx",
       "scope": "canonical-source",
-      "origin": "template",
-      "size": 1271,
-      "sha256": "c0a34e457a49748de6171a113383280e424992bbb8f70f97848a12762d23da26",
+      "origin": "overlay",
+      "size": 940,
+      "sha256": "e4046de59e5bf06e4134750e4625b4b00e5ec9a2aeecf7ad6c7d0e12dd047b43",
       "mode": 420
     },
     {
       "path": "src/app/start/page.tsx",
       "scope": "canonical-source",
-      "origin": "template",
-      "size": 8491,
-      "sha256": "0d810e1cba9aedee43d7937500ea87fde8ecf468e26a1d1ec21c142ece8d74ff",
+      "origin": "overlay",
+      "size": 525,
+      "sha256": "04f03bda3cb977743bac2c281525aadf0c4a850415984a1240d85d88a2bc0290",
       "mode": 420
     },
     {
@@ -1014,8 +1014,8 @@
       "path": "src/modules.ts",
       "scope": "canonical-source",
       "origin": "overlay",
-      "size": 3010,
-      "sha256": "5ea57f6a0419ef0120a1558fe878065a8454e258ce26b3054c70e3eb8674c3c3",
+      "size": 3051,
+      "sha256": "e229c1948b053917172a363ab9d45a481bdaa2732237e7fd222cd4114d4910d5",
       "mode": 420
     },
     {
@@ -2787,6 +2787,54 @@
       "mode": 420
     },
     {
+      "path": "src/modules/foundation_ui/components/LoginAvailability.tsx",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 3776,
+      "sha256": "3e41f7f654bd75e6f5e5c4b3d2982629775b4237cbd0a8313b18442b24338bc9",
+      "mode": 420
+    },
+    {
+      "path": "src/modules/foundation_ui/components/__tests__/LoginAvailability.test.tsx",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 10613,
+      "sha256": "4744b32a9cb22ccab5842f84334ddfa4629a12d351512059d92131cab6544077",
+      "mode": 420
+    },
+    {
+      "path": "src/modules/foundation_ui/i18n/en.json",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 412,
+      "sha256": "cb2baf2c5efe530329767074134212ded7dabe412a3c0a4ed8e49c9b795ef072",
+      "mode": 420
+    },
+    {
+      "path": "src/modules/foundation_ui/index.ts",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 271,
+      "sha256": "046b5d8d646b9ca02ce7ebdc4ac15d5af71d707447c03af87525dacd98a703dd",
+      "mode": 420
+    },
+    {
+      "path": "src/modules/foundation_ui/lib/availability.ts",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 477,
+      "sha256": "a2e08d5ae5286df05fb38ebfe4bf4deacde2f38587d245caed92b03445e66653",
+      "mode": 420
+    },
+    {
+      "path": "src/modules/foundation_ui/widgets/components.ts",
+      "scope": "canonical-source",
+      "origin": "overlay",
+      "size": 450,
+      "sha256": "426378e9d01df4f9e052ee314de876f6a09ded395ae2254c4c05afe14aeb2452",
+      "mode": 420
+    },
+    {
       "path": "src/modules/ratelimit_probe/api/ping/route.ts",
       "scope": "canonical-source",
       "origin": "template",
@@ -2845,6 +2893,12 @@
   ],
   "support": [
     {
+      "path": "engineering/foundation/acceptance.mjs",
+      "size": 27193,
+      "sha256": "2b2c349c5f775bf62527569cf6e7955299a7f6f660e26160c85b959f4961d320",
+      "mode": 420
+    },
+    {
       "path": "engineering/foundation/bootstrap.mjs",
       "size": 22621,
       "sha256": "43d506dce6f9fbf8a328bf5cc1422500d03d615ef3084564026fc284a8179298",
@@ -2857,9 +2911,15 @@
       "mode": 420
     },
     {
+      "path": "engineering/foundation/entry-boundary.mjs",
+      "size": 25435,
+      "sha256": "3284af3ad51433d1f044c9f9a8253d1a4313acf1151d78236a82799af14ee57e",
+      "mode": 420
+    },
+    {
       "path": "engineering/foundation/explore-app.mjs",
-      "size": 22717,
-      "sha256": "c2676b98f6654b3de261b89cc6fc85252df7144de9a254963998c75ee5a2bbf6",
+      "size": 36940,
+      "sha256": "6ec367155b2ef08c6fa4d22ae37513354c7447a379305d73fd552201d7651dee",
       "mode": 420
     },
     {
