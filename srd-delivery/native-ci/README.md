@@ -41,6 +41,17 @@ and distinct synthetic A/B operator/bootstrap credentials are generated at run
 time into mode-0600 files. No user account, provider credential or production
 database is used.
 
+The current workflow candidate selects `SRD_QA_BROWSER_PROVIDER=playwright-managed`.
+After immutable dependency installation it invokes the existing app's locked
+Playwright CLI to install Chromium OS dependencies and the matching headless
+shell, then requires an actual launch and close before fixture/bootstrap/build.
+It does not upgrade Playwright or use `npx`. This successor path has not executed:
+the prior Vercel runner passed native PostgreSQL/bootstrap and app checks but
+failed at the serverless Chromium launch before any UI case. Its safe report
+omitted the underlying error, so a missing-library cause remains an inference.
+The new preflight and browser helper diagnostics retain only fixed codes and a
+bounded numeric version; mock tests are not hosted browser acceptance.
+
 The workflow restores to `/tmp/srd-native-foundation-<run_id>-<attempt>/srd-ai-ops`, installs
 the original immutable Yarn lock without lifecycle scripts, enables the required
 native PostgreSQL extensions, runs the shipped native migrations and native

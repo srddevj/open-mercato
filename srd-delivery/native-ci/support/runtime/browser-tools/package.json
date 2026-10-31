@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Development-only browser capture for the owned synthetic application.",
   "engines": { "node": ">=24.0.0" },
-  "scripts": { "verify": "node verify.mjs" },
+  "scripts": { "verify": "node verify.mjs", "preflight": "node preflight.mjs", "test": "node --test browser-diagnostics.test.mjs browser-provider.test.mjs preflight.test.mjs" },
   "dependencies": { "@sparticuz/chromium": "153.0.0" }
 }

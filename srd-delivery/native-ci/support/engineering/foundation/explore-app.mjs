@@ -11,7 +11,7 @@ import { parseEnv } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateEnvironment } from './bootstrap.mjs';
 import { runAcceptance, createNativeInspector, validateBootstrap, reserveEvidence, writeReservedEvidence } from './acceptance.mjs';
-import { launchBrowser, browserConfiguration } from '../../runtime/browser-tools/browser.mjs';
+import { launchBrowser, browserConfiguration, browserLaunchFailureReport } from '../../runtime/browser-tools/browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const app = resolve(root, 'srd-ai-ops');
@@ -473,7 +473,11 @@ export async function main(argv = process.argv.slice(2)) {
     writeOwnedJson(descriptorPath, dirname(descriptorPath), descriptor);
     stage = 'browser-launch';
     browser = await launchBrowser();
-    report.browser = { actualVersion: browser.version(), playwrightVersion: (await browserConfiguration()).playwrightVersion };
+    stage = 'browser-configuration';
+    const browserConfig = await browserConfiguration();
+    report.browser = { actualVersion: browser.version(), playwrightVersion: browserConfig.playwrightVersion,
+      provider: browserConfig.provider, browserProvider: browserConfig.browserProvider, executableSource: browserConfig.executableSource };
+    stage = 'browser-context';
     context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     if (baselineOnly) {
       await context.route('**/*', async (route) => {
@@ -553,6 +557,7 @@ export async function main(argv = process.argv.slice(2)) {
   } catch (error) {
     report.failedStage = stage;
     report.errorCode = error instanceof ExplorationError ? error.code : 'APP_EXPLORATION_STEP_FAILED';
+    if (stage === 'browser-launch') report.browserLaunchFailure = browserLaunchFailureReport(error);
   } finally {
     if (report.loginAttempted && context && origin) report.uiSessionCleanup = await revokeObservedUiSession(context, origin);
     if (browser) {

@@ -117,6 +117,79 @@ def primary_fingerprints(output):
     return values
 
 
+def prepare_managed_browser(app_root, app, env):
+    """Fail before initdb/build unless the existing locked browser can launch and close."""
+    node = run('browser-node-executable', ['node', '-p', 'process.execPath'],
+               cwd=app, env=env, timeout=15).decode('utf-8').strip()
+    if not Path(node).is_absolute() or '\x00' in node or '\n' in node:
+        raise RuntimeError('absolute_browser_node_executable_required')
+    version = run('locked-playwright-version', [node, '-p',
+        "require('playwright-core/package.json').version"], cwd=app, env=env, timeout=15).decode('utf-8').strip()
+    if version != '1.64.1':
+        raise RuntimeError('reviewed_locked_playwright_version_required')
+    cli = app / 'node_modules/playwright-core/cli.js'
+    if not cli.is_file():
+        raise RuntimeError('locked_playwright_cli_required')
+    # This is the existing immutable app dependency, not npx or a package upgrade.
+    # The locked CLI supports Ubuntu 26.04 and supplies its own distro dependencies.
+    run('managed-browser-os-dependencies', ['sudo', '-n', node, str(cli),
+        'install-deps', 'chromium'], cwd=app, env=env, timeout=300)
+    run('locked-managed-chromium', [node, str(cli), 'install', 'chromium', '--only-shell'],
+        cwd=app, env=env, timeout=240)
+    env['SRD_QA_BROWSER_PROVIDER'] = 'playwright-managed'
+    # run() deliberately keeps raw process output private. This imported helper
+    # returns only fixed diagnostic codes and bounded numeric versions, even on
+    # failure; Python reconstructs an allowlisted report before exporting it.
+    output = run('browser-preflight-process', [node, '--input-type=module', '-e',
+        "import { runBrowserPreflight } from './runtime/browser-tools/preflight.mjs';"
+        "console.log(JSON.stringify(await runBrowserPreflight()));"],
+        cwd=app_root, env=env, timeout=45)
+    try:
+        value = json.loads(output)
+    except (ValueError, UnicodeError):
+        raise RuntimeError('managed_browser_preflight_report_invalid') from None
+    if (not isinstance(value, dict) or value.get('kind') != 'actual-browser-runtime-preflight' or
+            value.get('browserProvider') != 'playwright-managed' or
+            value.get('executableSource') != 'locked-playwright-managed-cache' or
+            value.get('productionAccepted') is not False):
+        raise RuntimeError('managed_browser_preflight_report_invalid')
+    safe = {'kind': 'actual-browser-runtime-preflight', 'status': 'blocked',
+            'browserProvider': 'playwright-managed', 'executableSource': 'locked-playwright-managed-cache',
+            'playwrightVersion': version, 'browserClosed': value.get('browserClosed') is True,
+            'productionAccepted': False}
+    numeric_version = value.get('browserVersion')
+    if isinstance(numeric_version, str) and re.fullmatch(r'[0-9]{1,5}(?:\.[0-9]{1,5}){1,4}', numeric_version):
+        safe['browserVersion'] = numeric_version
+    if value.get('status') == 'ready' and safe['browserClosed'] and 'browserVersion' in safe:
+        safe['status'] = 'ready'
+        report['browserPreflight'] = safe
+        report['stages'].append({'stage': 'managed-browser-launch-and-close', 'status': 'passed'})
+        return
+    diagnostic = value.get('browserLaunchFailure', {})
+    codes = {
+        'missing-library': 'BROWSER_SHARED_LIBRARY_UNAVAILABLE',
+        'executable': 'BROWSER_EXECUTABLE_UNAVAILABLE',
+        'permission': 'BROWSER_EXECUTION_PERMISSION_DENIED',
+        'sandbox': 'BROWSER_SANDBOX_LAUNCH_BLOCKED',
+        'timeout': 'BROWSER_LAUNCH_TIMED_OUT',
+        'other': 'BROWSER_LAUNCH_FAILED',
+    }
+    if isinstance(diagnostic, dict):
+        category = diagnostic.get('category')
+        if (isinstance(category, str) and category in codes and diagnostic.get('code') == codes[category] and
+                diagnostic.get('basis') == 'launch-error-pattern' and
+                diagnostic.get('rawDetailsRetained') is False):
+            safe['browserLaunchFailure'] = {'code': codes[category], 'category': category,
+                'basis': 'launch-error-pattern', 'rawDetailsRetained': False}
+    if value.get('failedStage') in ('configuration', 'launch', 'version', 'close'):
+        safe['failedStage'] = value['failedStage']
+    if value.get('errorCode') in ('BROWSER_PREFLIGHT_CONFIGURATION_INVALID', 'BROWSER_PREFLIGHT_VERSION_INVALID',
+            'BROWSER_PREFLIGHT_LAUNCH_FAILED', 'BROWSER_PREFLIGHT_STEP_FAILED', 'BROWSER_PREFLIGHT_CLOSE_FAILED'):
+        safe['errorCode'] = value['errorCode']
+    report['browserPreflight'] = safe
+    raise RuntimeError('managed_browser_launch_preflight_blocked')
+
+
 REPORT_FILES = {
     'evidence/native-ci/restoration.json',
     'evidence/native-ci/database-service.json',
@@ -273,6 +346,7 @@ def main(commit, revision):
         cwd=app, env={**env, 'YARN_ENABLE_SCRIPTS': 'false'}, timeout=720)
     run('locked-browser-dependencies', ['npm', 'ci', '--prefix', str(app_root / 'runtime/browser-tools'),
         '--ignore-scripts', '--no-audit', '--no-fund'], env=env, timeout=240)
+    prepare_managed_browser(app_root, app, env)
     data = ROOT / 'private/pgdata'
     password_file = ROOT / 'private/bootstrap-password'
     write(password_file, BOOTSTRAP + '\n')

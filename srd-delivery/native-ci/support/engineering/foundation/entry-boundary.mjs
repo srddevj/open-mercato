@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateEnvironment } from './bootstrap.mjs';
-import { launchBrowser } from '../../runtime/browser-tools/browser.mjs';
+import { launchBrowser, browserConfiguration, browserLaunchFailureReport } from '../../runtime/browser-tools/browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const app = resolve(root, 'srd-ai-ops');
@@ -356,9 +356,14 @@ try {
     for (const path of ['/', '/start']) await redirectCase(origin, name + (path === '/' ? '-home' : '-start'), path, cookie);
   }
   for (const path of ['/', '/start']) await redirectCase(origin, 'hostile-redirect-query' + (path === '/' ? '-home' : '-start'), path + '?redirect=https://invalid.example&returnTo=//invalid.example', '');
-  stage = 'browser-entry-regression';
+  stage = 'browser-launch';
   browser = await launchBrowser();
+  stage = 'browser-configuration';
   report.browserVersion = browser.version();
+  const browserConfig = await browserConfiguration();
+  report.browser = { provider: browserConfig.provider, browserProvider: browserConfig.browserProvider,
+    executableSource: browserConfig.executableSource, playwrightVersion: browserConfig.playwrightVersion };
+  stage = 'browser-entry-regression';
   await browserCase(origin);
   if (report.label === 'after') {
     const privateHost = new URL(config.DATABASE_URL).hostname;
@@ -367,9 +372,10 @@ try {
     }
   }
   report.status = report.cases.every((item) => item.passed) ? 'passed-anonymous-entry-regression-only' : 'failed-entry-regression';
-} catch {
+} catch (error) {
   report.failedStage = stage;
   report.errorCode = 'PUBLIC_ENTRY_VERIFICATION_BLOCKED';
+  if (stage === 'browser-launch') report.browserLaunchFailure = browserLaunchFailureReport(error);
 } finally {
   if (browser) { try { await browser.close(); report.browserClosed = true; } catch { report.browserClosed = false; } }
   if (server) {

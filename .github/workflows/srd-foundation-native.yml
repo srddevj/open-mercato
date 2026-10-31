@@ -42,6 +42,7 @@ jobs:
       CI: 'true'
       NEXT_TELEMETRY_DISABLED: '1'
       DO_NOT_TRACK: '1'
+      SRD_QA_BROWSER_PROVIDER: playwright-managed
       CI_ROOT: /tmp/srd-native-foundation-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +78,13 @@ jobs:
           corepack prepare yarn@4.17.1 --activate
           yarn install --immutable --mode=skip-build
           npm ci --prefix "$CI_ROOT/runtime/browser-tools" --ignore-scripts --no-audit --no-fund
+      - name: Install the locked managed Chromium and verify it before app initialization
+        working-directory: ${{ env.CI_ROOT }}/srd-ai-ops
+        run: |
+          SRD_BROWSER_NODE="$(node -p process.execPath)"
+          sudo -n "$SRD_BROWSER_NODE" node_modules/playwright-core/cli.js install-deps chromium
+          "$SRD_BROWSER_NODE" node_modules/playwright-core/cli.js install chromium --only-shell
+          "$SRD_BROWSER_NODE" "$CI_ROOT/runtime/browser-tools/preflight.mjs"
       - name: Prepare private synthetic credentials and native PostgreSQL extensions
         env:
           SRD_NATIVE_CI_CONFIRM: isolated-synthetic

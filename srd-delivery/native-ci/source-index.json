@@ -2912,26 +2912,56 @@
     },
     {
       "path": "engineering/foundation/entry-boundary.mjs",
-      "size": 25435,
-      "sha256": "3284af3ad51433d1f044c9f9a8253d1a4313acf1151d78236a82799af14ee57e",
+      "size": 25920,
+      "sha256": "1c96f57a73434854bc3c26ad35947220222d6a68ff366954884c1040357ba6ee",
       "mode": 420
     },
     {
       "path": "engineering/foundation/explore-app.mjs",
-      "size": 36940,
-      "sha256": "6ec367155b2ef08c6fa4d22ae37513354c7447a379305d73fd552201d7651dee",
+      "size": 37314,
+      "sha256": "a7e672acc6f8a9145e3290f318c57a0d9fd1a68c3c444263778367f0ba58e746",
       "mode": 420
     },
     {
       "path": "engineering/foundation/notice-overlap.mjs",
-      "size": 11867,
-      "sha256": "6d5619760ffab6b72e3d44ffd1d88602841bfd99f570e4bd6705ff4dd41a19c5",
+      "size": 12352,
+      "sha256": "83abdee5a6f58acf6f24139ffe41dda08fbfb5328fd385f5d756560dec0b670b",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/README.md",
+      "size": 7047,
+      "sha256": "9045dc353235c5b2c53fa2769ab4b775fbdbd7acd7ea11713fc17633bb1676a1",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/browser-diagnostics.mjs",
+      "size": 2728,
+      "sha256": "98c6a256a0838287964a9998e595e0618a2b5e7fa1601f9b084f3397a9ea774e",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/browser-diagnostics.test.mjs",
+      "size": 4638,
+      "sha256": "fa72b8da4e18bd70b7171fda471242f4912a14433dd6c770b58015f20e78c614",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/browser-provider.mjs",
+      "size": 1438,
+      "sha256": "eaba045a1c88a91204456e81bf0ea55a986823de8caff868d27308ca28c365a1",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/browser-provider.test.mjs",
+      "size": 3586,
+      "sha256": "56bf494df506a88effb24f3e0e9ba9531dbf15e66649d5282fd342733e9a45e6",
       "mode": 420
     },
     {
       "path": "runtime/browser-tools/browser.mjs",
-      "size": 2232,
-      "sha256": "6d11c6d029c8927e8b9c63824eece34b5ee2e2009c1584d16701647026a9aea6",
+      "size": 2659,
+      "sha256": "1f337a9c4f32d94cc0fe3069c640b1cbfed589b5b5683206c2b1a6f630d1252a",
       "mode": 420
     },
     {
@@ -2942,8 +2972,26 @@
     },
     {
       "path": "runtime/browser-tools/package.json",
-      "size": 328,
-      "sha256": "dda348cfdecc932c725ec02d70c5492008f33e3be0f5b67edd97c505130c7736",
+      "size": 460,
+      "sha256": "c387d30d7085aaed5a7b9303d604a69c68810f1a01c264d22fb1bee6a3ed64fa",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/preflight.mjs",
+      "size": 2633,
+      "sha256": "4211462f6977302f86912d86a1b3ca3de8d404a7dafc77d936a2353846596233",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/preflight.test.mjs",
+      "size": 4379,
+      "sha256": "0a1e158557a86519f058704e73d391f64f5e1ffc537dc262a8eb43d50b0c5035",
+      "mode": 420
+    },
+    {
+      "path": "runtime/browser-tools/verify.mjs",
+      "size": 2851,
+      "sha256": "b25014e96d45090223c40847db1e3a430da6f242a8ecf14d7bb1552329076286",
       "mode": 420
     }
   ]

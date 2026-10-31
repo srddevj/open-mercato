@@ -16,6 +16,136 @@ def module():
 
 
 class GuardTests(unittest.TestCase):
+    def browser_fixture(self, temporary, *, value=None, node='/usr/bin/node', version='1.64.1'):
+        m = module()
+        root = Path(temporary)
+        app = root / 'srd-ai-ops'
+        cli = app / 'node_modules/playwright-core/cli.js'
+        cli.parent.mkdir(parents=True)
+        cli.write_text('// mock only; never executed')
+        if value is None:
+            value = {'kind': 'actual-browser-runtime-preflight', 'status': 'ready',
+                     'browserProvider': 'playwright-managed',
+                     'executableSource': 'locked-playwright-managed-cache',
+                     'browserVersion': '153.0.8000.1', 'browserClosed': True,
+                     'productionAccepted': False}
+        def result(stage, args, **kwargs):
+            if stage == 'browser-node-executable':
+                return node.encode()
+            if stage == 'locked-playwright-version':
+                return version.encode()
+            if stage == 'browser-preflight-process':
+                return value if isinstance(value, bytes) else json.dumps(value).encode()
+            return b''
+        return m, root, app, result
+
+    def test_managed_browser_uses_existing_locked_cli_and_closes_before_accepting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m, root, app, result = self.browser_fixture(tmp)
+            env = {'CI': 'true'}
+            with patch.object(m, 'run', side_effect=result) as run:
+                m.prepare_managed_browser(root, app, env)
+            stages = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(stages, ['browser-node-executable', 'locked-playwright-version',
+                'managed-browser-os-dependencies', 'locked-managed-chromium', 'browser-preflight-process'])
+            deps = run.call_args_list[2].args[1]
+            self.assertEqual(deps[:3], ['sudo', '-n', '/usr/bin/node'])
+            self.assertEqual(deps[-2:], ['install-deps', 'chromium'])
+            download = run.call_args_list[3].args[1]
+            self.assertEqual(download[0], '/usr/bin/node')
+            self.assertNotIn('sudo', download)
+            self.assertEqual(download[-3:], ['install', 'chromium', '--only-shell'])
+            self.assertEqual(env['SRD_QA_BROWSER_PROVIDER'], 'playwright-managed')
+            self.assertEqual(m.report['browserPreflight']['status'], 'ready')
+            self.assertTrue(m.report['browserPreflight']['browserClosed'])
+            self.assertFalse(m.report['productionAccepted'])
+
+    def test_failed_browser_probe_preserves_only_fixed_diagnostic_not_raw_fields(self):
+        private = 'password=private-canary-value-do-not-export'
+        value = {'kind': 'actual-browser-runtime-preflight', 'status': 'blocked',
+                 'browserProvider': 'playwright-managed',
+                 'executableSource': 'locked-playwright-managed-cache',
+                 'browserClosed': False, 'productionAccepted': False,
+                 'failedStage': 'launch', 'errorCode': 'BROWSER_PREFLIGHT_LAUNCH_FAILED', 'rawError': private,
+                 'browserLaunchFailure': {'code': 'BROWSER_SHARED_LIBRARY_UNAVAILABLE',
+                     'category': 'missing-library', 'basis': 'launch-error-pattern',
+                     'rawDetailsRetained': False, 'stderr': private}}
+        with tempfile.TemporaryDirectory() as tmp:
+            m, root, app, result = self.browser_fixture(tmp, value=value)
+            with patch.object(m, 'run', side_effect=result):
+                with self.assertRaisesRegex(RuntimeError, '^managed_browser_launch_preflight_blocked$'):
+                    m.prepare_managed_browser(root, app, {})
+            self.assertEqual(m.report['browserPreflight']['browserLaunchFailure']['category'], 'missing-library')
+            self.assertEqual(m.report['browserPreflight']['failedStage'], 'launch')
+            self.assertEqual(m.report['browserPreflight']['errorCode'], 'BROWSER_PREFLIGHT_LAUNCH_FAILED')
+            self.assertNotIn(private, json.dumps(m.report))
+            self.assertNotIn('stderr', json.dumps(m.report))
+            self.assertNotIn({'stage': 'managed-browser-launch-and-close', 'status': 'passed'}, m.report['stages'])
+
+    def test_managed_browser_rejects_simulated_malformed_unclosed_or_wrong_provider_probe(self):
+        values = [b'not-json-private-canary',
+            {'kind': 'simulated-browser-runtime-preflight', 'status': 'ready'},
+            {'kind': 'actual-browser-runtime-preflight', 'status': 'ready',
+             'browserProvider': 'sparticuz', 'browserClosed': True, 'productionAccepted': False},
+            {'kind': 'actual-browser-runtime-preflight', 'status': 'ready',
+             'browserProvider': 'playwright-managed', 'executableSource': 'locked-playwright-managed-cache',
+             'browserVersion': '153.0.1', 'browserClosed': False, 'productionAccepted': False},
+            {'kind': 'actual-browser-runtime-preflight', 'status': 'ready',
+             'browserProvider': 'playwright-managed', 'executableSource': 'locked-playwright-managed-cache',
+             'browserVersion': 'secret-value', 'browserClosed': True, 'productionAccepted': False}]
+        for value in values:
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
+                m, root, app, result = self.browser_fixture(tmp, value=value)
+                with patch.object(m, 'run', side_effect=result):
+                    with self.assertRaisesRegex(RuntimeError, '^managed_browser_(?:preflight_report_invalid|launch_preflight_blocked)$'):
+                        m.prepare_managed_browser(root, app, {})
+                self.assertNotEqual(m.report.get('browserPreflight', {}).get('status'), 'ready')
+                self.assertNotIn('private-canary', json.dumps(m.report))
+                self.assertNotIn('secret-value', json.dumps(m.report))
+
+    def test_unreviewed_driver_or_relative_node_never_starts_sudo_or_download(self):
+        for arguments in ({'version': '9.9.9'}, {'node': 'node'}):
+            with self.subTest(arguments=arguments), tempfile.TemporaryDirectory() as tmp:
+                m, root, app, result = self.browser_fixture(tmp, **arguments)
+                with patch.object(m, 'run', side_effect=result) as run:
+                    with self.assertRaises(RuntimeError):
+                        m.prepare_managed_browser(root, app, {})
+                self.assertTrue(all(call.args[0] not in ('managed-browser-os-dependencies',
+                    'locked-managed-chromium', 'browser-preflight-process') for call in run.call_args_list))
+
+    def test_failed_browser_preflight_prevents_initdb_migrations_and_app_build(self):
+        m = module()
+        with tempfile.TemporaryDirectory() as tmp:
+            m.ROOT = Path(tmp) / 'fresh'
+            original_read = Path.read_text
+            def read(path, *args, **kwargs):
+                return 'ID=ubuntu\nVERSION_CODENAME=resolute\n' if str(path) == '/etc/os-release' else original_read(path, *args, **kwargs)
+            def run(stage, args, **kwargs):
+                if stage == 'verify-pgdg-key':
+                    return ('pub:::::::::\nfpr:::::::::' + m.KEY_FINGERPRINT + ':\n').encode()
+                if stage == 'node-version':
+                    return b'24.22.1'
+                if stage == 'source-commit-verification':
+                    return b'a' * 40
+                if stage == 'source-pinned-checkout':
+                    index = m.ROOT / 'source/srd-delivery/native-ci/source-index.json'
+                    index.parent.mkdir(parents=True)
+                    index.write_text(json.dumps({'sourceRevision': 'b' * 64}))
+                return b''
+            with patch.object(m.os, 'geteuid', return_value=1000), patch.object(Path, 'read_text', read), \
+                 patch.object(m, 'transmitted_bytes', return_value=0), patch.object(m.threading, 'Thread'), \
+                 patch.object(m, 'run', side_effect=run) as command, \
+                 patch.object(m, 'prepare_managed_browser', side_effect=RuntimeError('managed_browser_launch_preflight_blocked')) as probe:
+                with self.assertRaisesRegex(RuntimeError, '^managed_browser_launch_preflight_blocked$'):
+                    m.main('a' * 40, 'b' * 64)
+            probe.assert_called_once()
+            stages = [call.args[0] for call in command.call_args_list]
+            self.assertIn('locked-browser-dependencies', stages)
+            self.assertNotIn('fresh-nonroot-initdb', stages)
+            self.assertNotIn('native-migrations-and-auth', stages)
+            self.assertNotIn('app-build', stages)
+            self.assertFalse(m.started_pg)
+
     def test_preexisting_root_and_zip_are_never_read_overwritten_or_cleaned(self):
         m = module()
         with tempfile.TemporaryDirectory() as tmp:

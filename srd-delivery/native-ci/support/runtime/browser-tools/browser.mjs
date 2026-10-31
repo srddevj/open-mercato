@@ -2,6 +2,8 @@
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import chromium from '@sparticuz/chromium';
+import { launchBrowserProvider, browserProviderMetadata, selectBrowserProvider } from './browser-provider.mjs';
+export { browserLaunchFailureReport } from './browser-diagnostics.mjs';
 
 const requireFromApp = createRequire(fileURLToPath(new URL('../../srd-ai-ops/package.json', import.meta.url)));
 const { chromium: playwright } = requireFromApp('playwright-core');
@@ -28,25 +30,22 @@ export const productQaArguments = chromium.args.flatMap((argument) => {
 });
 
 export async function launchBrowser() {
-  return playwright.launch({
-    args: productQaArguments,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
+  return launchBrowserProvider({ selection: process.env.SRD_QA_BROWSER_PROVIDER,
+    browserType: playwright, serverless: chromium, arguments: productQaArguments });
 }
 
 export async function browserConfiguration() {
+  const selection = selectBrowserProvider(process.env.SRD_QA_BROWSER_PROVIDER);
   return {
-    provider: 'playwright',
+    ...browserProviderMetadata(selection),
     playwrightVersion: requireFromApp('playwright-core/package.json').version,
-    chromiumPackageVersion: '153.0.0',
-    executablePath: await chromium.executablePath(),
-    args: [...productQaArguments],
+    chromiumPackageVersion: selection === 'sparticuz' ? '153.0.0' : null,
+    argumentOverrides: selection === 'sparticuz' ? [...productQaArguments] : [],
     headless: true,
     constraints: {
-      browserSandboxDisabledForRootContainer: true,
-      webSecurityDisablingArgumentsRemoved: true,
-      siteIsolationDisablingArgumentsRemoved: true,
+      operatingSystemSandboxMode: selection === 'sparticuz' ? 'serverless-package-defaults' : 'playwright-defaults-unverified',
+      customWebSecurityDisablingArgumentsSupplied: false,
+      customSiteIsolationDisablingArgumentsSupplied: false,
       nativeBrowserSandboxSecurityAccepted: false,
       crossOriginBehaviorTested: false,
     },

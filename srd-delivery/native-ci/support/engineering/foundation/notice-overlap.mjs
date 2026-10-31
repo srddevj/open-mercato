@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateEnvironment } from './bootstrap.mjs';
-import { launchBrowser } from '../../runtime/browser-tools/browser.mjs';
+import { launchBrowser, browserConfiguration, browserLaunchFailureReport } from '../../runtime/browser-tools/browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const app = resolve(root, 'srd-ai-ops');
@@ -185,9 +185,14 @@ try {
   const healthResponse = await fetch(origin + '/api/healthz', { signal: AbortSignal.timeout(12000) });
   const healthBody = await healthResponse.json().catch(() => ({}));
   report.health = { status: healthResponse.status, state: healthBody.status === 'ok' ? 'ok' : healthBody.status === 'degraded' ? 'degraded' : 'unknown' };
-  stage = 'browser-regression';
+  stage = 'browser-launch';
   browser = await launchBrowser();
+  stage = 'browser-configuration';
   report.browserVersion = browser.version();
+  const browserConfig = await browserConfiguration();
+  report.browser = { provider: browserConfig.provider, browserProvider: browserConfig.browserProvider,
+    executableSource: browserConfig.executableSource, playwrightVersion: browserConfig.playwrightVersion };
+  stage = 'browser-regression';
   await keyboardCase('mobile-light', { width: 375, height: 812 }, 'light', origin);
   await keyboardCase('desktop-light', { width: 1440, height: 1000 }, 'light', origin);
   await keyboardCase('mobile-dark', { width: 375, height: 812 }, 'dark', origin);
@@ -195,9 +200,10 @@ try {
   await acknowledgementCase('dismiss-cookie-notice-persists', 'Dismiss', 'dismissed', origin);
   await acknowledgementCase('accept-cookie-notice-persists', 'Accept cookies', 'ack', origin);
   report.status = report.cases.every((current) => current.passed) ? 'passed-ui-regression-only' : 'failed-ui-regression';
-} catch {
+} catch (error) {
   report.failedStage = stage;
   report.errorCode = 'NOTICE_UI_VERIFICATION_BLOCKED';
+  if (stage === 'browser-launch') report.browserLaunchFailure = browserLaunchFailureReport(error);
 } finally {
   if (browser) { try { await browser.close(); report.browserClosed = true; } catch { report.browserClosed = false; } }
   if (server) {

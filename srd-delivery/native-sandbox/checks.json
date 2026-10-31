@@ -1,29 +1,25 @@
 {
-  "kind": "offline-native-sandbox-candidate-review",
-  "status": "offline-guards-and-independent-review-passed-runtime-unexecuted",
+  "kind": "offline-native-browser-recovery-candidate-review",
+  "status": "offline-reviewed-native-managed-browser-unexecuted",
   "controllerGuardTests": 12,
-  "runnerGuardTests": 8,
-  "frozenExplorerApiUnitTests": 29,
-  "independentNarrowReviewPassed": true,
-  "syntaxChecks": [
-    "controller.mjs",
-    "runner.py"
-  ],
-  "providerMutationsExecuted": false,
-  "guestVmCreated": false,
-  "databaseStarted": false,
-  "sourceCommit": "intentionally-required-after-final-UI-publication",
+  "connectedBridgeGuardTests": 25,
+  "browserGuardTests": 23,
+  "combinedNodeGuards": 143,
+  "mockedRunnerGuardTests": 13,
+  "archiveGuardTests": 12,
+  "independentReviewPassed": true,
   "sourceRevision": "bf8fd4b0e435f79b04a45f4ef0ddc9e50e72c6ee937c7dae784f81ec2f024f99",
-  "runnerSha256": "4e6a2fd37230f3340d2588c6be1bc8113ac286b20370b910749215a7ee1c3b6e",
-  "billingBasis": "unknown-no-spending-authorized",
-  "projectIdCreated": false,
-  "apiVerificationHookConfigured": true,
-  "apiVerificationRuntimeExecuted": false,
+  "sourceCommit": "required-after-publication-before-new-runtime-approval",
+  "runnerSha256": "48ed667dfd54f8c53297174afbe8257face2f221bb0c4dc5c9e91a034c2c977e",
+  "managedBrowserRuntimeExecuted": false,
+  "newVmAuthorized": false,
+  "priorApprovedFlightCompletedAndStopped": true,
+  "productionAccepted": false,
   "files": [
     {
       "path": "engineering/native-sandbox/README.md",
-      "size": 8590,
-      "sha256": "7cc6c4c80539d92f29903f7cac4e1a6d88dbbfea2fb1de54b86a8d30b75a1981"
+      "size": 11226,
+      "sha256": "5120889aca49384cffff88f0fed4d0975eb9f25e7e4174e72245ad6d4c47ff01"
     },
     {
       "path": "engineering/native-sandbox/controller.mjs",
@@ -36,19 +32,29 @@
       "sha256": "d7d64901915493f85cf61ff2f91ed759cba8c7c04e67a0c9d41fed81b9fbf300"
     },
     {
+      "path": "engineering/native-sandbox/connected-flight.mjs",
+      "size": 12601,
+      "sha256": "9a3af0f6c264ad21d33a4ce04def854adaee4424f5c9ca45d7f68a06a5ed157d"
+    },
+    {
+      "path": "engineering/native-sandbox/connected-flight.test.mjs",
+      "size": 11073,
+      "sha256": "d35d85d4d5c06528558fee61fa192cfb097dc97ef494158e617b81d4fde788aa"
+    },
+    {
       "path": "engineering/native-sandbox/request.example.json",
-      "size": 609,
-      "sha256": "0775a488b522dc80c2407ff9034c53e0e77662b1e2fad88c92d934013eb88ff8"
+      "size": 620,
+      "sha256": "159f233d31f3f01bfaec7a353d66af08e193cc6f35b8a586f2f67fa743396545"
     },
     {
       "path": "engineering/native-sandbox/runner.py",
-      "size": 19965,
-      "sha256": "4e6a2fd37230f3340d2588c6be1bc8113ac286b20370b910749215a7ee1c3b6e"
+      "size": 24649,
+      "sha256": "48ed667dfd54f8c53297174afbe8257face2f221bb0c4dc5c9e91a034c2c977e"
     },
     {
       "path": "engineering/native-sandbox/test_runner.py",
-      "size": 8560,
-      "sha256": "d4fa5c5d3f1480e5e81b0ff7d84d33cdf1b420417647ecd8ad1b0f5eafc94c22"
+      "size": 17189,
+      "sha256": "f1a0808fd8212ac3fda63ed37350e62de475e427134011f06f3030ee9c76ffe3"
     }
   ]
 }

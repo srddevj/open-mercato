@@ -1,9 +1,15 @@
 # Bounded native PostgreSQL verification candidate
 
-**Offline authored; no VM, project, database or billable resource has been created.**
-The connected team's plan and an owned product project are not established.
-`request.example.json` intentionally contains blocking project/source placeholders
-and no spending approval. Do not run it yet.
+**This successor candidate is offline reviewed and has not run in a VM.**
+The previous reviewed runner (`4e6a2fd3…1c3b6e`) used the single approved VM
+allowance on 31 October 2026. Native PostgreSQL17/bootstrap, build/test/type/lint/design
+and health200 passed, then Chromium launch failed before any UI case, screenshot,
+login or API acceptance. The app, PostgreSQL and VM were stopped; the observed
+flight is preserved under `evidence/2026-10-31/native-vercel/`. That approval is
+consumed. This candidate needs a new explicit single-run authorization before
+compute is provisioned; it must never resume or replace the stopped attempt.
+`request.example.json` keeps blocking public project/source placeholders and no
+spending approval. Do not infer a free selected-team plan or permission from it.
 
 This is one fresh, nonpersistent Vercel Sandbox in `iad1`, with 4 vCPUs (8 GB RAM),
 no exposed ports, no mounted drives/snapshots, and a 45-minute provider timeout.
@@ -49,6 +55,22 @@ must be established before assuming that treatment.
    The standalone app lives outside the core checkout. Do not scaffold or upgrade.
 4. Install the original immutable Yarn lock and existing browser lock without
    lifecycle scripts. Node 24/Corepack availability is checked or fails closed.
+   Require the existing locked `playwright-core`1.64.1, then use its CLI to
+   install Chromium's Ubuntu dependencies and its matching managed headless
+   shell. No `npx`, new dependency version, scaffold or serverless binary is used
+   for this native candidate. The CLI is invoked with the actual absolute Node
+   executable; only `install-deps` runs under noninteractive sudo. Browser download
+   and launch run as the default non-root user. Select
+   `SRD_QA_BROWSER_PROVIDER=playwright-managed` for the remaining checks.
+   Before `initdb`, migrations or app build, launch and close the actual browser.
+   Require the real preflight kind, managed provider, bounded numeric version and
+   successful close. A failed/unknown/malformed/simulated result stops the run and
+   exports only fixed safe diagnostic codes. This is a candidate remedy and
+   fail-fast verification; the prior run did not capture its exact launch error,
+   so missing system libraries have not been proven as that run's cause.
+   Ubuntu26.04 support was checked in the installed1.64.1 package's platform
+   detector and explicit `ubuntu26.04-x64` dependency map in `lib/coreBundle.js`;
+   this source check is not a successful Ubuntu launch.
 5. Run native `initdb` as the default non-root Ubuntu user into a fresh private
    directory. PostgreSQL listens only on `127.0.0.1:15432` and uses a private Unix
    socket directory. The public synthetic bootstrap-only password is passed in a
@@ -71,6 +93,12 @@ must be established before assuming that treatment.
    or database dumps. Cleanup/export are permitted only after this invocation
    exclusively creates its own root; an existing or raced root is never read,
    bundled, overwritten or cleaned. The controller then attempts VM stop.
+
+The matching CI workflow also selects the managed browser, installs it using the
+existing locked CLI and runs the same launch/close preflight before private
+fixture preparation. Neither updated hosted path has executed. The app's canonical
+336-file source revision remains unchanged; indexed QA helper bytes must be
+refreshed and the final payload published before selecting its source commit.
 
 The network monitor fails closed when counters cannot be read or reset, and
 terminates the active guest command. Observed Ubuntu/Node/PostgreSQL/extension
@@ -113,7 +141,14 @@ acceptance remains false.
 | read | `vercel_read_session_file` for `/vercel/sandbox/srd-native-run/evidence.zip` |
 | stop | `vercel_stop_session` in `finally` |
 
-No adapter has been authenticated/exercised for this candidate. On ambiguous create
+The previous flight exercised a connected adapter with the old runner. Its REST
+wire format used `{networkPolicy: {mode: "allow-all"}}`, and the owned
+`/vercel/sandbox` directory had to exist before extracting the reviewed tarball.
+The read-file connector truncated the full ZIP's base64 string; the adapter
+retrieved bounded chunks and verified whole-file size/SHA-256/CRC rather than
+accepting truncated bytes. Those are transport observations, not evidence that
+this successor runner or managed browser works. No new authenticated execution
+has occurred for this candidate. On ambiguous create
 or failed stop, the thrown error and journal retain safe cleanup-needed metadata.
 Do not provision a replacement: inspect that exact journaled name through a
 read-only lookup, preserve its timeout, and resolve cleanup first. The journal
