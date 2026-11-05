@@ -1,0 +1,43 @@
+name: SRD Inventory Source Verification
+on:
+  push:
+    branches: [build/inventory-source-verification-20261105]
+    paths: [.github/workflows/srd-inventory-source-verification.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pinned upstream main snapshot, not the commercial application
+        uses: actions/checkout@v4
+        with:
+          repository: open-mercato/open-mercato
+          ref: 03f813eaafd15c80331be248c433f7eff942cf59
+          path: upstream
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Record and archive exact source
+        run: |
+          mkdir evidence
+          git -C upstream rev-parse HEAD > evidence/upstream-commit.txt
+          git -C upstream archive --format=tar.gz HEAD > evidence/upstream-source.tar.gz
+          npm view create-mercato-app version dist-tags --json > evidence/published-generator.json
+          npx --yes create-mercato-app@latest --help > evidence/generator-help.txt
+      - name: Scaffold separate application from official release
+        env:
+          CI: 'true'
+        run: |
+          npx --yes create-mercato-app@latest inventory-os --preset classic --agents all
+          tar --exclude=node_modules --exclude=.git --exclude=.env -czf evidence/inventory-scaffold.tar.gz inventory-os
+      - name: Preserve source evidence even if scaffolding fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: srd-inventory-upstream-source
+          path: evidence/
+          retention-days: 7
