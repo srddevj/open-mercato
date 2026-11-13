@@ -74,3 +74,11 @@ the exact standalone router vocabulary; module tags use snake_case; topic tags u
 the matching index row, keep cited titles stable, and run `yarn lessons:check`. Hard safety and
 workflow boundaries still belong in the closest `AGENTS.md`; a lesson carries the evidence,
 recurring failure mode, durable rule, and affected surfaces.
+
+## Delivery evidence
+
+Trace one user journey through the affected module's normal entry point. Label fictional fixtures and respect tenant scope and the project's existing UI conventions. Keep a source or test result beside each outcome.
+
+For a backend list filter, exercise a matching value, a value with zero matches, and clearing the filter. The last step should restore the expected rows for the same tenant. For a retried write, check the resulting state and the receipt or error.
+
+In the handoff, record what was observed, any untested path, and the next check. For a multi-step system, show the decision and its failure path in a diagram with a readable text equivalent.

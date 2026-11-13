@@ -2,13 +2,11 @@
 
 Leverage the module system and follow strict naming and coding conventions to keep the system consistent and safe to extend.
 
-> **Instruction budget:** this file must stay under **32,768 bytes** (Codex's default
-> `project_doc_max_bytes`, shared with the nested `AGENTS.md` files below it) — anything past
-> that byte offset never reaches the agent. Keep hard rules and routing here, put long-form
-> procedure in `.ai/docs/*`, and run `yarn agents:check-budget`. See
-> [`.ai/docs/agent-instructions.md`](.ai/docs/agent-instructions.md).
+> **Instruction budget:** Codex loads up to 32,768 bytes across root and nested files. Keep root rules short, put procedures in `.ai/docs/`, and run `yarn agents:check-budget`. See [instruction guidance](.ai/docs/agent-instructions.md).
 
 ## Always
+
+- For a user-facing change, record the entry point, fixture, visible result, and recovery check. See [delivery evidence](.ai/docs/agent-instructions.md#delivery-evidence).
 
 - Check the Task Router below before research or coding; a single task may match multiple rows, and all relevant guides apply.
 - Check `.ai/specs/` and `.ai/specs/enterprise/` for existing specs before modifying a module.
